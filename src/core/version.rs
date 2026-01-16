@@ -1,6 +1,25 @@
 use crate::core::os::Platform;
+use anyhow::bail;
+use anyhow::Result;
+use std::path::{Component, Path};
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
+
+pub fn validate_version_string(v: &str) -> Result<()> {
+    let path = Path::new(v);
+    let mut components = path.components();
+
+    match components.next() {
+        Some(Component::Normal(_)) => {}
+        _ => bail!("Invalid version string: {}", v),
+    }
+
+    if components.next().is_some() {
+        bail!("Invalid version string: {}", v);
+    }
+
+    Ok(())
+}
 
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     // version: "5.0.0" -> major_minor: "5.0"
@@ -62,5 +81,28 @@ mod tests {
             url,
             "https://download.blender.org/release/Blender5.0/blender-5.0.0-macos-arm64.dmg"
         );
+    }
+
+    #[test]
+    fn test_validate_version_string() {
+        // ✅
+        assert!(validate_version_string("5.0.0").is_ok());
+        assert!(validate_version_string("4.2").is_ok());
+        assert!(validate_version_string("custom-build-v1").is_ok());
+
+        // ❌
+        assert!(validate_version_string("..").is_err());
+        assert!(validate_version_string("../5.0.0").is_err());
+        assert!(validate_version_string("5.0.0/..").is_err());
+
+        assert!(validate_version_string("/usr/bin").is_err());
+        assert!(validate_version_string("/5.0.0").is_err());
+
+        assert!(validate_version_string("subdir/5.0.0").is_err());
+
+        if std::path::MAIN_SEPARATOR == '\\' {
+            assert!(validate_version_string("..\\5.0.0").is_err());
+            assert!(validate_version_string("C:\\Windows").is_err());
+        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::core::config;
+use crate::core::{config, version};
 use anyhow::{Context, Result};
 use console::style;
 use directories::BaseDirs;
@@ -6,9 +6,7 @@ use std::fs;
 use std::io::{self, Write};
 
 pub fn run(version: String, yes: bool) -> Result<()> {
-    if version.contains('/') || version.contains('\\') || version == ".." {
-        anyhow::bail!("Invalid version format");
-    }
+    version::validate_version_string(&version)?;
     let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
     let install_dir = base_dirs
         .data_local_dir()
@@ -16,7 +14,7 @@ pub fn run(version: String, yes: bool) -> Result<()> {
         .join("versions")
         .join(&version);
 
-    if !install_dir.exists() {
+    if !install_dir.is_dir() {
         println!(
             "{} Version {} is not installed.",
             style("i").blue(),

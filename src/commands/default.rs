@@ -1,4 +1,4 @@
-use crate::core::config;
+use crate::core::{config, version};
 use anyhow::{Context, Result, bail};
 use console::style;
 use directories::BaseDirs;
@@ -8,9 +8,7 @@ pub fn run(version: Option<String>) -> Result<()> {
 
     match version {
         Some(v) => {
-            if v.contains('/') || v.contains('\\') || v == ".." {
-                bail!("Invalid version format");
-            }
+            version::validate_version_string(&v)?;
             let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
             let install_dir = base_dirs
                 .data_local_dir()
@@ -18,7 +16,7 @@ pub fn run(version: Option<String>) -> Result<()> {
                 .join("versions")
                 .join(&v);
 
-            if !install_dir.exists() {
+            if !install_dir.is_dir() {
                 bail!("Version {} is not installed. Please install it first.", v);
             }
 
