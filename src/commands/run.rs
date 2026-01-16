@@ -1,5 +1,5 @@
 use crate::core::{config, os};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use console::style;
 use directories::BaseDirs;
 use std::fs;

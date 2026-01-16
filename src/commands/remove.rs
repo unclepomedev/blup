@@ -44,12 +44,12 @@ pub fn run(version: String, yes: bool) -> Result<()> {
     println!("{} Removing Blender {}...", style("==>").red(), version);
     fs::remove_dir_all(&install_dir).context("Failed to remove directory")?;
 
-    if let Ok(mut settings) = config::load() {
-        if settings.default_version.as_deref() == Some(&version) {
-            settings.default_version = None;
-            config::save(&settings)?;
-            println!("{} Cleared default version.", style("i").blue());
-        }
+    if let Ok(mut settings) = config::load()
+        && settings.default_version.as_deref() == Some(&version)
+    {
+        settings.default_version = None;
+        config::save(&settings)?;
+        println!("{} Cleared default version.", style("i").blue());
     }
 
     println!(

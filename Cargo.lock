@@ -151,7 +151,6 @@ dependencies = [
  "clap",
  "console",
  "directories",
- "flate2",
  "futures-util",
  "indicatif",
  "reqwest",

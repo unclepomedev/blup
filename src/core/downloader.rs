@@ -15,14 +15,25 @@ pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Resu
         .error_for_status()
         .context(format!("Failed to connect to {}", url))?;
 
-    let total_size = res
-        .content_length()
-        .context("Failed to get content length")?;
+    let total_size = res.content_length();
 
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
-        .progress_chars("#>-"));
+    let pb = match total_size {
+        Some(len) => {
+            let pb = ProgressBar::new(len);
+            pb.set_style(ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
+                .progress_chars("#>-"));
+            pb
+        }
+        None => {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.green} [{elapsed_precise}] {bytes} downloaded")?,
+            );
+            pb
+        }
+    };
 
     let mut file = File::create(dest_path)
         .await
@@ -37,11 +48,17 @@ pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Resu
             .await
             .context("Error while writing to file")?;
 
-        let new = min(downloaded + (chunk.len() as u64), total_size);
+        let new = if let Some(total) = total_size {
+            min(downloaded + (chunk.len() as u64), total)
+        } else {
+            downloaded + (chunk.len() as u64)
+        };
+
         downloaded = new;
         pb.set_position(new);
     }
 
+    file.flush().await?;
     pb.finish_with_message("Download complete 🚀");
     Ok(())
 }
