@@ -182,6 +182,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
+ "walkdir",
  "wiremock",
  "xz2",
  "zip",

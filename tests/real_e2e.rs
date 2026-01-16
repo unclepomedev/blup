@@ -27,6 +27,9 @@ async fn test_real_server_install_and_remove() -> anyhow::Result<()> {
         .output()
         .expect("Failed to execute install command");
 
+    println!("--- Install stdout ---");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+
     if !output.status.success() {
         println!("--- Install stdout ---");
         println!("{}", String::from_utf8_lossy(&output.stdout));
@@ -45,24 +48,42 @@ async fn test_real_server_install_and_remove() -> anyhow::Result<()> {
         .success()
         .stdout(predicate::str::contains(target_version));
 
-    #[cfg(target_os = "macos")]
-    let bin_path = temp_home
-        .path()
-        .join("versions")
-        .join(target_version)
-        .join("Blender.app")
-        .join("Contents")
-        .join("MacOS")
-        .join("Blender");
-
-    #[cfg(not(target_os = "macos"))]
-    let bin_path = temp_home
-        .path()
-        .join("versions")
-        .join(target_version)
-        .join(bin_name);
+    let bin_path = if cfg!(target_os = "macos") {
+        temp_home
+            .path()
+            .join("versions")
+            .join(target_version)
+            .join("Blender.app")
+            .join("Contents")
+            .join("MacOS")
+            .join("Blender")
+    } else {
+        // Windows / Linux
+        let bin_name = if cfg!(windows) {
+            "blender.exe"
+        } else {
+            "blender"
+        };
+        temp_home
+            .path()
+            .join("versions")
+            .join(target_version)
+            .join(bin_name)
+    };
 
     if !bin_path.exists() {
+        println!("!!! Binary check failed. Dumping directory structure:");
+        let versions_dir = temp_home.path().join("versions");
+        if versions_dir.exists() {
+            for entry in walkdir::WalkDir::new(&versions_dir) {
+                match entry {
+                    Ok(e) => println!(" - {}", e.path().display()),
+                    Err(err) => println!("Error reading entry: {}", err),
+                }
+            }
+        } else {
+            println!("versions directory does not exist at {:?}", versions_dir);
+        }
         panic!(
             "Binary not found at expected path: {:?}. \nCheck extraction logic (strip components).",
             bin_path
