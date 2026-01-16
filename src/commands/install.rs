@@ -1,14 +1,12 @@
-use crate::core::{downloader, extractor, os, version};
-use anyhow::{Context, Result};
+use crate::core::{config, downloader, extractor, os, version};
+use anyhow::Result;
 use console::style;
-use directories::BaseDirs;
 use reqwest::Client;
 use std::fs;
 
 pub async fn run(target_version: String) -> Result<()> {
-    let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
-    let data_dir = base_dirs.data_local_dir().join("blup").join("versions");
-    let install_dir = data_dir.join(&target_version);
+    let app_root = config::get_app_root()?;
+    let install_dir = app_root.join("versions").join(&target_version);
 
     if install_dir.exists() {
         println!(

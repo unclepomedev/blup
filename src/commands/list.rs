@@ -1,12 +1,11 @@
 use crate::core::config;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use console::style;
-use directories::BaseDirs;
 use std::fs;
 
 pub fn run() -> Result<()> {
-    let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
-    let data_dir = base_dirs.data_local_dir().join("blup").join("versions");
+    let app_root = config::get_app_root()?;
+    let data_dir = app_root.join("versions");
 
     if !data_dir.exists() {
         println!("No Blender versions installed yet.");

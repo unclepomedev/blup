@@ -1,18 +1,14 @@
 use crate::core::{config, version};
 use anyhow::{Context, Result};
 use console::style;
-use directories::BaseDirs;
 use std::fs;
 use std::io::{self, Write};
 
 pub fn run(version: String, yes: bool) -> Result<()> {
     version::validate_version_string(&version)?;
-    let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
-    let install_dir = base_dirs
-        .data_local_dir()
-        .join("blup")
-        .join("versions")
-        .join(&version);
+
+    let app_root = config::get_app_root()?;
+    let install_dir = app_root.join("versions").join(&version);
 
     if !install_dir.is_dir() {
         println!(

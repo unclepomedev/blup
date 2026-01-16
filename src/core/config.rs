@@ -10,17 +10,20 @@ pub struct Settings {
     pub default_version: Option<String>,
 }
 
-pub fn get_config_dir() -> Result<PathBuf> {
+pub fn get_app_root() -> Result<PathBuf> {
+    if let Ok(root) = std::env::var("BLUP_ROOT") {
+        return Ok(PathBuf::from(root));
+    }
+
     let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
-    let config_dir = base_dirs.config_dir().join("blup");
-    if config_dir.exists() {
-        if !config_dir.is_dir() {
-            anyhow::bail!(
-                "Config path exists but is not a directory: {}",
-                config_dir.display()
-            );
-        }
-    } else {
+    Ok(base_dirs.data_local_dir().join("blup"))
+}
+
+pub fn get_config_dir() -> Result<PathBuf> {
+    let root = get_app_root()?;
+    let config_dir = root.join("config");
+
+    if !config_dir.exists() {
         fs::create_dir_all(&config_dir)?;
     }
     Ok(config_dir)
