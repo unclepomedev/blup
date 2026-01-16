@@ -48,7 +48,7 @@ async fn test_download_and_extract_flow() {
     }
     assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
 
-    let exe_path = extract_dir.join("Blender5.0").join("blender.exe");
+    let exe_path = extract_dir.join("blender.exe");
     assert!(
         exe_path.exists(),
         "Extracted file not found at {:?}",

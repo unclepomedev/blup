@@ -24,10 +24,20 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => dest_dir.join(path),
+        let path = match file.enclosed_name() {
+            Some(p) => p,
             None => continue,
         };
+
+        let mut components = path.components();
+        components.next();
+        let stripped_path = components.as_path();
+
+        if stripped_path.as_os_str().is_empty() {
+            continue;
+        }
+
+        let outpath = dest_dir.join(stripped_path);
 
         if file.name().ends_with('/') {
             fs::create_dir_all(&outpath)?;
@@ -56,9 +66,30 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let tar = xz2::read::XzDecoder::new(file);
     let mut archive = tar::Archive::new(tar);
 
-    archive
-        .unpack(dest_dir)
-        .context("Failed to unpack tar.xz archive")?;
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.to_path_buf();
+
+        let mut components = path.components();
+        components.next();
+        let stripped_path = components.as_path();
+
+        if stripped_path.as_os_str().is_empty() {
+            continue;
+        }
+
+        let outpath = dest_dir.join(stripped_path);
+
+        if let Some(p) = outpath.parent()
+            && !p.exists()
+        {
+            fs::create_dir_all(p)?;
+        }
+
+        entry
+            .unpack(&outpath)
+            .context("Failed to unpack file from tar")?;
+    }
     Ok(())
 }
 
