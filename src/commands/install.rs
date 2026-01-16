@@ -11,12 +11,20 @@ pub async fn run(target_version: String) -> Result<()> {
     let install_dir = data_dir.join(&target_version);
 
     if install_dir.exists() {
-        println!("{} Version {} is already installed at {:?}",
-                 style("i").blue(), target_version, install_dir);
+        println!(
+            "{} Version {} is already installed at {:?}",
+            style("i").blue(),
+            target_version,
+            install_dir
+        );
         return Ok(());
     }
 
-    println!("{} Installing Blender {}...", style("==>").green(), target_version);
+    println!(
+        "{} Installing Blender {}...",
+        style("==>").green(),
+        target_version
+    );
 
     let platform = os::detect_platform()?;
     let url = version::build_url(version::OFFICIAL_URL, &target_version, &platform);
@@ -35,7 +43,11 @@ pub async fn run(target_version: String) -> Result<()> {
 
     extractor::extract(&archive_path, &install_dir)?;
 
-    println!("\n{} Blender {} installed successfully! 🎉", style("SUCCESS").green().bold(), target_version);
+    println!(
+        "\n{} Blender {} installed successfully! 🎉",
+        style("SUCCESS").green().bold(),
+        target_version
+    );
     println!("    Location: {:?}", install_dir);
 
     Ok(())

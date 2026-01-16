@@ -22,7 +22,9 @@ async fn test_download_command_with_mock() {
     let url = format!("{}/fake_blender.zip", &mock_server.uri());
     let archive_path = temp_dir.path().join("downloaded.zip");
 
-    downloader::download_file(&client, &url, &archive_path).await.unwrap();
+    downloader::download_file(&client, &url, &archive_path)
+        .await
+        .unwrap();
 
     let extract_dir = temp_dir.path().join("extracted");
     let result = extractor::extract(&archive_path, &extract_dir);
@@ -30,5 +32,9 @@ async fn test_download_command_with_mock() {
     assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
 
     let exe_path = extract_dir.join("Blender5.0").join("blender.exe");
-    assert!(exe_path.exists(), "Extracted file not found at {:?}", exe_path);
+    assert!(
+        exe_path.exists(),
+        "Extracted file not found at {:?}",
+        exe_path
+    );
 }

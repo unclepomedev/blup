@@ -1,6 +1,6 @@
 use crate::core::os::Platform;
-use anyhow::bail;
 use anyhow::Result;
+use anyhow::bail;
 use std::path::{Component, Path};
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";

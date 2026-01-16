@@ -32,10 +32,10 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         if file.name().ends_with('/') {
             fs::create_dir_all(&outpath)?;
         } else {
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(p)?;
-                }
+            if let Some(p) = outpath.parent()
+                && !p.exists()
+            {
+                fs::create_dir_all(p)?;
             }
             let mut outfile = fs::File::create(&outpath)?;
             std::io::copy(&mut file, &mut outfile)?;
@@ -71,7 +71,7 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let mount_point = mount_dir.path();
 
     let status = Command::new("hdiutil")
-        .args(&["attach", "-nobrowse", "-readonly", "-mountpoint"])
+        .args(["attach", "-nobrowse", "-readonly", "-mountpoint"])
         .arg(mount_point)
         .arg(archive_path)
         .status()
@@ -93,7 +93,7 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
             Ok(status) => status,
             Err(err) => {
                 let _ = Command::new("hdiutil")
-                    .args(&["detach"])
+                    .args(["detach"])
                     .arg(mount_point)
                     .status();
                 return Err(err).context("Failed to execute cp command");
@@ -102,21 +102,21 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         if !copy_status.success() {
             let _ = Command::new("hdiutil")
-                .args(&["detach"])
+                .args(["detach"])
                 .arg(mount_point)
                 .status();
             bail!("Failed to copy Blender.app from DMG");
         }
     } else {
         let _ = Command::new("hdiutil")
-            .args(&["detach"])
+            .args(["detach"])
             .arg(mount_point)
             .status();
         bail!("Blender.app not found in DMG");
     }
 
     let detach_status = Command::new("hdiutil")
-        .args(&["detach", "-force"])
+        .args(["detach", "-force"])
         .arg(mount_point)
         .status()
         .context("Failed to execute hdiutil detach")?;
