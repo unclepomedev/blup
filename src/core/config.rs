@@ -76,3 +76,133 @@ pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
         "No version specified. Use `blup run <version>` or set a default with `blup default <version>`."
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use std::io::Write;
+    use std::sync::Mutex;
+    use tempfile::tempdir;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct ScopedEnv {
+        key: String,
+        original: Option<String>,
+    }
+
+    impl ScopedEnv {
+        fn new(key: &str, value: &str) -> Self {
+            let original = env::var(key).ok();
+            unsafe {
+                env::set_var(key, value);
+            }
+            Self {
+                key: key.to_string(),
+                original,
+            }
+        }
+    }
+
+    impl Drop for ScopedEnv {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.original {
+                    Some(v) => env::set_var(&self.key, v),
+                    None => env::remove_var(&self.key),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_save_and_load_settings() -> Result<()> {
+        let _lock = ENV_LOCK.lock();
+
+        let temp_dir = tempdir()?;
+        let _env_guard = ScopedEnv::new("BLUP_ROOT", temp_dir.path().to_str().unwrap());
+
+        let settings = Settings {
+            default_version: Some("4.2.0".to_string()),
+        };
+        save(&settings)?;
+
+        let config_path = temp_dir.path().join("config").join("settings.toml");
+        assert!(config_path.exists());
+
+        let loaded = load()?;
+        assert_eq!(loaded.default_version, Some("4.2.0".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_empty_returns_default() -> Result<()> {
+        let _lock = ENV_LOCK.lock();
+
+        let temp_dir = tempdir()?;
+        let _env_guard = ScopedEnv::new("BLUP_ROOT", temp_dir.path().to_str().unwrap());
+
+        let loaded = load()?;
+        assert_eq!(loaded.default_version, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_priority() -> Result<()> {
+        let _lock = ENV_LOCK.lock();
+
+        let temp_root = tempdir()?;
+        let project_dir = tempdir()?;
+
+        let _env_guard = ScopedEnv::new("BLUP_ROOT", temp_root.path().to_str().unwrap());
+
+        let original_cwd = env::current_dir()?;
+        env::set_current_dir(&project_dir)?;
+
+        struct CwdGuard(PathBuf);
+        impl Drop for CwdGuard {
+            fn drop(&mut self) {
+                let _ = env::set_current_dir(&self.0);
+            }
+        }
+        let _cwd_guard = CwdGuard(original_cwd);
+
+        save(&Settings {
+            default_version: Some("GlobalDefault".into()),
+        })?;
+
+        {
+            let mut file = fs::File::create(".blender-version")?;
+            write!(file, "LocalFile")?;
+        }
+
+        let result = resolve_version(Some("ArgVersion".into()))?;
+        assert_eq!(result, "ArgVersion", "arg should be used if specified");
+
+        let result = resolve_version(None)?;
+        assert_eq!(
+            result, "LocalFile",
+            "The local file should be used if no arg is specified"
+        );
+
+        fs::remove_file(".blender-version")?;
+
+        let result = resolve_version(None)?;
+        assert_eq!(
+            result, "GlobalDefault",
+            "Global setting should be used if no local exists"
+        );
+
+        save(&Settings {
+            default_version: None,
+        })?;
+
+        let result = resolve_version(None);
+        assert!(result.is_err(), "Should be an error if nothing specified");
+
+        Ok(())
+    }
+}
