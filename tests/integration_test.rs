@@ -19,7 +19,7 @@ async fn test_download_and_extract_flow() {
         zip.write_all(b"fake blender binary content").unwrap();
 
         let cursor = zip.finish().unwrap();
-        cursor.into_inner() // Vec<u8> を取り出す
+        cursor.into_inner()
     };
 
     Mock::given(method("GET"))
