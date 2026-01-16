@@ -12,6 +12,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Install { version: String },
+    List,
 }
 
 #[tokio::main]
@@ -21,6 +22,9 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Install { version } => {
             commands::install::run(version).await?;
+        }
+        Commands::List => {
+            commands::list::run()?;
         }
     }
 
