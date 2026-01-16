@@ -11,12 +11,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Install { version: String },
+    Install {
+        version: String,
+    },
     List,
     Run {
         version: String,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+    Remove {
+        version: String,
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
     },
 }
 
@@ -33,6 +40,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Run { version, args } => {
             commands::run::run(version, args)?;
+        }
+        Commands::Remove { version, yes } => {
+            commands::remove::run(version, yes)?;
         }
     }
 
