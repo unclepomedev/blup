@@ -13,6 +13,11 @@ struct Cli {
 enum Commands {
     Install { version: String },
     List,
+    Run {
+        version: String,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -25,6 +30,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::List => {
             commands::list::run()?;
+        }
+        Commands::Run { version, args } => {
+            commands::run::run(version, args)?;
         }
     }
 

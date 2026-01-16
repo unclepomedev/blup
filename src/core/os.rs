@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use std::env;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq)]
 pub struct Platform {
@@ -30,4 +31,25 @@ pub fn detect_platform() -> Result<Platform> {
         arch: arch_str.to_string(),
         ext: ext.to_string(),
     })
+}
+
+pub fn get_bin_path(install_dir: &Path) -> Result<PathBuf> {
+    let os = env::consts::OS;
+
+    let bin_path = match os {
+        "windows" => install_dir.join("blender.exe"),
+        "linux" => install_dir.join("blender"),
+        "macos" => install_dir
+            .join("Blender.app")
+            .join("Contents")
+            .join("MacOS")
+            .join("Blender"),
+        _ => bail!("Unsupported OS for running: {}", os),
+    };
+
+    if !bin_path.exists() {
+        bail!("Blender executable not found at: {:?}", bin_path);
+    }
+
+    Ok(bin_path)
 }
