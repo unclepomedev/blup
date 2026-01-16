@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Default)]
@@ -25,8 +26,7 @@ pub fn load() -> Result<Settings> {
     }
 
     let content = fs::read_to_string(config_path)?;
-    let settings: Settings = toml::from_str(&content)
-        .context("Failed to parse settings.toml")?;
+    let settings: Settings = toml::from_str(&content).context("Failed to parse settings.toml")?;
 
     Ok(settings)
 }
@@ -36,4 +36,33 @@ pub fn save(settings: &Settings) -> Result<()> {
     let content = toml::to_string_pretty(settings)?;
     fs::write(config_path, content)?;
     Ok(())
+}
+
+pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
+    if let Some(v) = arg_version {
+        return Ok(v);
+    }
+
+    let local_file = Path::new(".blender-version");
+    if local_file.exists() {
+        let content = fs::read_to_string(local_file).context("Failed to read .blender-version")?;
+        let v = content.trim().to_string();
+        if !v.is_empty() {
+            println!(
+                "{} Found .blender-version: {}",
+                console::style("i").blue(),
+                v
+            );
+            return Ok(v);
+        }
+    }
+
+    let settings = load()?;
+    if let Some(v) = settings.default_version {
+        return Ok(v);
+    }
+
+    anyhow::bail!(
+        "No version specified. Use `blup run <version>` or set a default with `blup default <version>`."
+    );
 }

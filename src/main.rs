@@ -16,7 +16,7 @@ enum Commands {
     },
     List,
     Run {
-        version: String,
+        version: Option<String>,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
