@@ -1,5 +1,5 @@
-use std::env;
 use anyhow::{bail, Result};
+use std::env;
 
 #[derive(Debug, PartialEq)]
 pub struct Platform {

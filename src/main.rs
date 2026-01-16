@@ -1,5 +1,7 @@
-mod core;
+use reqwest::Client;
 
-fn main() {
-    println!("Hello, world!");
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let client = Client::new();
+    Ok(())
 }
