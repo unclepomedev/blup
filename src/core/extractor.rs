@@ -2,9 +2,6 @@ use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-
 pub fn extract(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let path_str = archive_path.to_string_lossy();
 
@@ -19,15 +16,35 @@ pub fn extract(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     }
 }
 
-/// e.g. "Blender-4.5/blender.exe" -> Some("blender.exe")
-fn get_stripped_path(path: &Path) -> Option<PathBuf> {
+fn sanitize_and_strip_path(path: &Path) -> Result<Option<PathBuf>> {
     let mut components = path.components();
-    components.next()?;
-    let stripped = components.as_path();
-    if stripped.as_os_str().is_empty() {
-        None
+
+    if components.next().is_none() {
+        return Ok(None);
+    }
+
+    let mut sanitized = PathBuf::new();
+
+    for component in components {
+        match component {
+            Component::Normal(c) => sanitized.push(c),
+            Component::CurDir => continue,
+            Component::ParentDir => {
+                bail!("Security violation: Path traversal attempted: {:?}", path);
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                bail!(
+                    "Security violation: Absolute path or prefix detected: {:?}",
+                    path
+                );
+            }
+        }
+    }
+
+    if sanitized.as_os_str().is_empty() {
+        Ok(None)
     } else {
-        Some(stripped.to_path_buf())
+        Ok(Some(sanitized))
     }
 }
 
@@ -37,19 +54,15 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let path = match file.enclosed_name() {
-            Some(p) => p,
-            None => continue,
+
+        let raw_path = match file.enclosed_name() {
+            Some(p) => p.to_owned(),
+            None => file.mangled_name(),
         };
 
-        let stripped_path = match get_stripped_path(&path) {
+        let stripped_path = match sanitize_and_strip_path(&raw_path)? {
             Some(p) => p,
-            None => {
-                if file.name().ends_with('/') {
-                    continue;
-                }
-                path.to_path_buf()
-            }
+            None => continue,
         };
 
         let outpath = dest_dir.join(stripped_path);
@@ -68,6 +81,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         #[cfg(unix)]
         {
+            use std::os::unix::fs::PermissionsExt;
             if let Some(mode) = file.unix_mode() {
                 fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
             }
@@ -85,25 +99,10 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         let mut entry = entry?;
         let path = entry.path()?.to_path_buf();
 
-        let stripped_path = match get_stripped_path(&path) {
+        let stripped_path = match sanitize_and_strip_path(&path)? {
             Some(p) => p,
-            None => {
-                if entry.header().entry_type().is_dir() {
-                    continue;
-                }
-                path.clone()
-            }
+            None => continue,
         };
-
-        if stripped_path
-            .components()
-            .any(|c| matches!(c, Component::ParentDir))
-        {
-            bail!(
-                "Security violation: Path traversal attempted in tar archive: {:?}",
-                stripped_path
-            );
-        }
 
         let outpath = dest_dir.join(stripped_path);
 
@@ -190,19 +189,6 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
     use zip::write::FileOptions;
-
-    #[test]
-    fn test_stripped_path_logic() {
-        let p = Path::new("RootFolder/SubFolder/file.txt");
-        let stripped = get_stripped_path(p).unwrap();
-        assert_eq!(stripped, Path::new("SubFolder/file.txt"));
-
-        let p_root_only = Path::new("RootFolder");
-        assert!(get_stripped_path(p_root_only).is_none());
-
-        let p_file = Path::new("file.txt");
-        assert!(get_stripped_path(p_file).is_none());
-    }
 
     #[test]
     fn test_extract_zip_strips_root() -> Result<()> {
