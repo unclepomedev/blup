@@ -73,7 +73,13 @@ jobs:
           mkdir "$dirname"
           
           mv "target/${{ matrix.target }}/release/$binary_name" "$dirname/"
-          cp README.md LICENSE "$dirname/" || true
+          for file in README.md LICENSE; do
+            if [ -f "$file" ]; then
+              cp "$file" "$dirname/"
+            else
+              echo "Warning: $file not found, skipping"
+            fi
+          done
 
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             7z a "$dirname.zip" "$dirname"
