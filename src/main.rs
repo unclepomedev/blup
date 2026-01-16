@@ -25,6 +25,9 @@ enum Commands {
         #[arg(short = 'y', long = "yes")]
         yes: bool,
     },
+    Default {
+        version: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -43,6 +46,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Remove { version, yes } => {
             commands::remove::run(version, yes)?;
+        }
+        Commands::Default { version } => {
+            commands::default::run(version)?;
         }
     }
 
