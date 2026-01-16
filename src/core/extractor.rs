@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -44,7 +44,12 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let stripped_path = match get_stripped_path(&path) {
             Some(p) => p,
-            None => continue,
+            None => {
+                if file.name().ends_with('/') {
+                    continue;
+                }
+                path.to_path_buf()
+            }
         };
 
         let outpath = dest_dir.join(stripped_path);
@@ -82,8 +87,23 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let stripped_path = match get_stripped_path(&path) {
             Some(p) => p,
-            None => continue,
+            None => {
+                if entry.header().entry_type().is_dir() {
+                    continue;
+                }
+                path.clone()
+            }
         };
+
+        if stripped_path
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+        {
+            bail!(
+                "Security violation: Path traversal attempted in tar archive: {:?}",
+                stripped_path
+            );
+        }
 
         let outpath = dest_dir.join(stripped_path);
 
@@ -104,6 +124,11 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     use std::process::Command;
     use tempfile::TempDir;
+
+    if !dest_dir.exists() {
+        fs::create_dir_all(dest_dir)
+            .context("Failed to create destination directory for DMG extraction")?;
+    }
 
     let mount_dir = TempDir::new().context("Failed to create temp dir for mounting")?;
     let mount_point = mount_dir.path().to_path_buf();

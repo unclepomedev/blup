@@ -48,9 +48,9 @@ The URL must point to the directory structure equivalent to `https://download.bl
 
 ```shell
 # Linux / macOS
-export BLUP_MIRROR_URL=[https://mirror.example.com/blender/release](https://mirror.example.com/blender/release)
+export BLUP_MIRROR_URL=https://mirror.example.com/blender/release
 # Windows (PowerShell)
-$env:BLUP_MIRROR_URL="[https://mirror.example.com/blender/release](https://mirror.example.com/blender/release)"
+$env:BLUP_MIRROR_URL="https://mirror.example.com/blender/release"
 ````
 
 ### Uninstall

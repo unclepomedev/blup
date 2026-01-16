@@ -46,6 +46,8 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_url_generation_windows() {
@@ -112,6 +114,8 @@ mod tests {
 
     #[test]
     fn test_url_generation_with_mirror() {
+        let _lock = ENV_LOCK.lock().unwrap();
+
         unsafe {
             env::set_var("BLUP_MIRROR_URL", "https://mirror.example.com");
         }
