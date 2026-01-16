@@ -9,9 +9,8 @@ use zip::write::FileOptions;
 async fn test_download_and_extract_flow() {
     let mock_server = MockServer::start().await;
 
-    let mut buffer = Vec::new();
-    {
-        let mut zip = zip::ZipWriter::new(Cursor::new(&mut buffer));
+    let buffer = {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
 
         let options =
             FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
@@ -19,8 +18,9 @@ async fn test_download_and_extract_flow() {
         zip.start_file("Blender5.0/blender.exe", options).unwrap();
         zip.write_all(b"fake blender binary content").unwrap();
 
-        zip.finish().unwrap();
-    }
+        let cursor = zip.finish().unwrap();
+        cursor.into_inner() // Vec<u8> を取り出す
+    };
 
     Mock::given(method("GET"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes(buffer))
@@ -37,8 +37,15 @@ async fn test_download_and_extract_flow() {
         .unwrap();
 
     let extract_dir = temp_dir.path().join("extracted");
+
+    let meta = std::fs::metadata(&archive_path).unwrap();
+    println!("Downloaded file size: {} bytes", meta.len());
+
     let result = extractor::extract(&archive_path, &extract_dir);
 
+    if let Err(e) = &result {
+        println!("Extraction error details: {:?}", e);
+    }
     assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
 
     let exe_path = extract_dir.join("Blender5.0").join("blender.exe");

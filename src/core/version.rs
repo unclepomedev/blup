@@ -22,7 +22,11 @@ pub fn validate_version_string(v: &str) -> Result<()> {
 }
 
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
-    let base_url = env::var("BLUP_MIRROR_URL").unwrap_or_else(|_| base.to_string());
+    let base_url = env::var("BLUP_MIRROR_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| base.to_string());
 
     // version: "5.0.0" -> major_minor: "5.0"
     let parts: Vec<&str> = version.split('.').collect();
