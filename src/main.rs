@@ -17,6 +17,8 @@ enum Commands {
     List,
     Run {
         version: Option<String>,
+        #[arg(long)]
+        scripts: Option<String>,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
@@ -41,8 +43,12 @@ async fn main() -> anyhow::Result<()> {
         Commands::List => {
             commands::list::run()?;
         }
-        Commands::Run { version, args } => {
-            commands::run::run(version, args)?;
+        Commands::Run {
+            version,
+            scripts,
+            args,
+        } => {
+            commands::run::run(version, scripts, args)?;
         }
         Commands::Remove { version, yes } => {
             commands::remove::run(version, yes)?;
