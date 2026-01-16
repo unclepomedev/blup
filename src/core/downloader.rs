@@ -11,7 +11,8 @@ pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Resu
     let res = client
         .get(url)
         .send()
-        .await
+        .await?
+        .error_for_status()
         .context(format!("Failed to connect to {}", url))?;
 
     let total_size = res

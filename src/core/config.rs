@@ -13,7 +13,14 @@ pub struct Settings {
 pub fn get_config_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
     let config_dir = base_dirs.config_dir().join("blup");
-    if !config_dir.exists() {
+    if config_dir.exists() {
+        if !config_dir.is_dir() {
+            anyhow::bail!(
+                "Config path exists but is not a directory: {}",
+                config_dir.display()
+            );
+        }
+    } else {
         fs::create_dir_all(&config_dir)?;
     }
     Ok(config_dir)

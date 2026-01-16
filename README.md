@@ -9,7 +9,8 @@ Supports `.blender-version` files, context-aware execution, and script path inje
 
 ```shell
 git clone https://github.com/unclepomedev/blup.git
-cargo install --path ./blup
+cd blup
+cargo install --path .
 ```
 
 ## Quick Start

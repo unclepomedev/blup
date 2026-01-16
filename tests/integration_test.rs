@@ -17,7 +17,6 @@ async fn test_download_command_with_mock() {
         .await;
 
     let temp_dir = tempfile::tempdir().unwrap();
-    let dest_path = temp_dir.path().join("downloaded_blender.zip");
 
     let client = Client::new();
     let url = format!("{}/fake_blender.zip", &mock_server.uri());

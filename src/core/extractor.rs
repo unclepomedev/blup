@@ -84,12 +84,21 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let app_source = mount_point.join("Blender.app");
 
     if app_source.exists() {
-        let copy_status = Command::new("cp")
+        let copy_status = match Command::new("cp")
             .arg("-R")
             .arg(&app_source)
             .arg(dest_dir)
             .status()
-            .context("Failed to execute cp command")?;
+        {
+            Ok(status) => status,
+            Err(err) => {
+                let _ = Command::new("hdiutil")
+                    .args(&["detach"])
+                    .arg(mount_point)
+                    .status();
+                return Err(err).context("Failed to execute cp command");
+            }
+        };
 
         if !copy_status.success() {
             let _ = Command::new("hdiutil")

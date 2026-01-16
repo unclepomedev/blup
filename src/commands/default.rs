@@ -8,6 +8,9 @@ pub fn run(version: Option<String>) -> Result<()> {
 
     match version {
         Some(v) => {
+            if v.contains('/') || v.contains('\\') || v == ".." {
+                bail!("Invalid version format");
+            }
             let base_dirs = BaseDirs::new().context("Could not determine home directory")?;
             let install_dir = base_dirs
                 .data_local_dir()
