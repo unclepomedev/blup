@@ -46,6 +46,8 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_url_generation_windows() {
@@ -108,5 +110,29 @@ mod tests {
             assert!(validate_version_string("..\\5.0.0").is_err());
             assert!(validate_version_string("C:\\Windows").is_err());
         }
+    }
+
+    #[test]
+    fn test_url_generation_with_mirror() {
+        let _lock = ENV_LOCK.lock().unwrap();
+
+        unsafe {
+            env::set_var("BLUP_MIRROR_URL", "https://mirror.example.com");
+        }
+
+        let platform = Platform {
+            os: "windows".to_string(),
+            arch: "x64".to_string(),
+            ext: "zip".to_string(),
+        };
+
+        let url = build_url(OFFICIAL_URL, "4.5.0", &platform);
+        unsafe {
+            env::remove_var("BLUP_MIRROR_URL");
+        }
+        assert_eq!(
+            url,
+            "https://mirror.example.com/Blender4.5/blender-4.5.0-windows-x64.zip"
+        );
     }
 }

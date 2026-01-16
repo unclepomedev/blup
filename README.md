@@ -43,6 +43,16 @@ blup run  # Auto-detects 5.0.0 from file
 blup run --scripts ./my_addon
 ```
 
+You can set the `BLUP_MIRROR_URL` environment variable.
+The URL must point to the directory structure equivalent to `https://download.blender.org/release`.
+
+```shell
+# Linux / macOS
+export BLUP_MIRROR_URL=https://mirror.example.com/blender/release
+# Windows (PowerShell)
+$env:BLUP_MIRROR_URL="https://mirror.example.com/blender/release"
+````
+
 ### Uninstall
 
 ```shell

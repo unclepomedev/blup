@@ -53,3 +53,70 @@ pub fn get_bin_path(install_dir: &Path) -> Result<PathBuf> {
 
     Ok(bin_path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_detect_platform_sanity_check() {
+        let platform = detect_platform();
+        assert!(platform.is_ok());
+
+        let p = platform.unwrap();
+        if cfg!(windows) {
+            assert_eq!(p.os, "windows");
+            assert_eq!(p.ext, "zip");
+        } else if cfg!(target_os = "macos") {
+            assert_eq!(p.os, "macos");
+            assert_eq!(p.ext, "dmg");
+        } else if cfg!(target_os = "linux") {
+            assert_eq!(p.os, "linux");
+            assert_eq!(p.ext, "tar.xz");
+        }
+    }
+
+    #[test]
+    fn test_get_bin_path_success() -> Result<()> {
+        let temp = tempdir()?;
+        let root = temp.path();
+
+        let expected_bin = if cfg!(target_os = "macos") {
+            let path = root.join("Blender.app/Contents/MacOS/Blender");
+            fs::create_dir_all(path.parent().unwrap())?;
+            fs::File::create(&path)?;
+            path
+        } else if cfg!(windows) {
+            let path = root.join("blender.exe");
+            fs::File::create(&path)?;
+            path
+        } else {
+            // Linux and others
+            let path = root.join("blender");
+            fs::File::create(&path)?;
+            path
+        };
+
+        let result = get_bin_path(root)?;
+
+        assert_eq!(result, expected_bin);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bin_path_not_found() -> Result<()> {
+        let temp = tempdir()?;
+        let root = temp.path();
+
+        let result = get_bin_path(root);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Blender executable not found"));
+
+        Ok(())
+    }
+}

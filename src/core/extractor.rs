@@ -1,8 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::fs;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 pub fn extract(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let path_str = archive_path.to_string_lossy();
@@ -18,24 +16,54 @@ pub fn extract(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     }
 }
 
+fn sanitize_and_strip_path(path: &Path) -> Result<Option<PathBuf>> {
+    let mut components = path.components();
+
+    if components.next().is_none() {
+        return Ok(None);
+    }
+
+    let mut sanitized = PathBuf::new();
+
+    for component in components {
+        match component {
+            Component::Normal(c) => sanitized.push(c),
+            Component::CurDir => continue,
+            Component::ParentDir => {
+                bail!("Security violation: Path traversal attempted: {:?}", path);
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                bail!(
+                    "Security violation: Absolute path or prefix detected: {:?}",
+                    path
+                );
+            }
+        }
+    }
+
+    if sanitized.as_os_str().is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(sanitized))
+    }
+}
+
 fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let file = fs::File::open(archive_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let path = match file.enclosed_name() {
+
+        let raw_path = match file.enclosed_name() {
+            Some(p) => p.to_owned(),
+            None => file.mangled_name(),
+        };
+
+        let stripped_path = match sanitize_and_strip_path(&raw_path)? {
             Some(p) => p,
             None => continue,
         };
-
-        let mut components = path.components();
-        components.next();
-        let stripped_path = components.as_path();
-
-        if stripped_path.as_os_str().is_empty() {
-            continue;
-        }
 
         let outpath = dest_dir.join(stripped_path);
 
@@ -53,6 +81,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         #[cfg(unix)]
         {
+            use std::os::unix::fs::PermissionsExt;
             if let Some(mode) = file.unix_mode() {
                 fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
             }
@@ -70,13 +99,10 @@ fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         let mut entry = entry?;
         let path = entry.path()?.to_path_buf();
 
-        let mut components = path.components();
-        components.next();
-        let stripped_path = components.as_path();
-
-        if stripped_path.as_os_str().is_empty() {
-            continue;
-        }
+        let stripped_path = match sanitize_and_strip_path(&path)? {
+            Some(p) => p,
+            None => continue,
+        };
 
         let outpath = dest_dir.join(stripped_path);
 
@@ -98,12 +124,17 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     use std::process::Command;
     use tempfile::TempDir;
 
+    if !dest_dir.exists() {
+        fs::create_dir_all(dest_dir)
+            .context("Failed to create destination directory for DMG extraction")?;
+    }
+
     let mount_dir = TempDir::new().context("Failed to create temp dir for mounting")?;
-    let mount_point = mount_dir.path();
+    let mount_point = mount_dir.path().to_path_buf();
 
     let status = Command::new("hdiutil")
         .args(["attach", "-nobrowse", "-readonly", "-mountpoint"])
-        .arg(mount_point)
+        .arg(&mount_point)
         .arg(archive_path)
         .status()
         .context("Failed to execute hdiutil attach")?;
@@ -112,54 +143,82 @@ fn extract_dmg(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         bail!("hdiutil failed to mount the DMG");
     }
 
+    let _guard = DmgGuard(&mount_point);
+
     let app_source = mount_point.join("Blender.app");
-
-    if app_source.exists() {
-        let copy_status = match Command::new("cp")
-            .arg("-R")
-            .arg(&app_source)
-            .arg(dest_dir)
-            .status()
-        {
-            Ok(status) => status,
-            Err(err) => {
-                let _ = Command::new("hdiutil")
-                    .args(["detach"])
-                    .arg(mount_point)
-                    .status();
-                return Err(err).context("Failed to execute cp command");
-            }
-        };
-
-        if !copy_status.success() {
-            let _ = Command::new("hdiutil")
-                .args(["detach"])
-                .arg(mount_point)
-                .status();
-            bail!("Failed to copy Blender.app from DMG");
-        }
-    } else {
-        let _ = Command::new("hdiutil")
-            .args(["detach"])
-            .arg(mount_point)
-            .status();
+    if !app_source.exists() {
         bail!("Blender.app not found in DMG");
     }
 
-    let detach_status = Command::new("hdiutil")
-        .args(["detach", "-force"])
-        .arg(mount_point)
+    let copy_status = Command::new("cp")
+        .arg("-R")
+        .arg(&app_source)
+        .arg(dest_dir)
         .status()
-        .context("Failed to execute hdiutil detach")?;
+        .context("Failed to execute cp command")?;
 
-    if !detach_status.success() {
-        eprintln!("Warning: Failed to detach DMG at {:?}", mount_point);
+    if !copy_status.success() {
+        bail!("Failed to copy Blender.app from DMG");
     }
 
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+struct DmgGuard<'a>(&'a Path);
+
+#[cfg(target_os = "macos")]
+impl<'a> Drop for DmgGuard<'a> {
+    fn drop(&mut self) {
+        use std::process::Command;
+        let _ = Command::new("hdiutil")
+            .args(["detach", "-force"])
+            .arg(self.0)
+            .status();
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 fn extract_dmg(_: &Path, _: &Path) -> Result<()> {
     bail!("DMG extraction is only supported on macOS");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
+    use zip::write::FileOptions;
+
+    #[test]
+    fn test_extract_zip_strips_root() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let archive_path = temp_dir.path().join("test.zip");
+        let dest_dir = temp_dir.path().join("out");
+
+        {
+            let file = fs::File::create(&archive_path)?;
+            let mut zip = zip::ZipWriter::new(file);
+            let options = FileOptions::<()>::default();
+
+            zip.start_file("RootFolder/file.txt", options)?;
+            zip.write_all(b"content")?;
+
+            zip.start_file("RootFolder/subdir/nested.txt", options)?;
+            zip.write_all(b"nested")?;
+
+            zip.finish()?;
+        }
+
+        extract(&archive_path, &dest_dir)?;
+
+        let extracted_file = dest_dir.join("file.txt");
+        assert!(extracted_file.exists());
+        assert_eq!(fs::read_to_string(extracted_file)?, "content");
+
+        let nested_file = dest_dir.join("subdir/nested.txt");
+        assert!(nested_file.exists());
+
+        Ok(())
+    }
 }
