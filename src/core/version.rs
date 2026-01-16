@@ -1,6 +1,6 @@
 use crate::core::os::Platform;
-use anyhow::Result;
-use anyhow::bail;
+use anyhow::{Result, bail};
+use std::env;
 use std::path::{Component, Path};
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
@@ -22,6 +22,8 @@ pub fn validate_version_string(v: &str) -> Result<()> {
 }
 
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
+    let base_url = env::var("BLUP_MIRROR_URL").unwrap_or_else(|_| base.to_string());
+
     // version: "5.0.0" -> major_minor: "5.0"
     let parts: Vec<&str> = version.split('.').collect();
     let major_minor = if parts.len() >= 2 {
@@ -33,7 +35,7 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     // e.g. https://download.blender.org/release/Blender5.0/blender-5.0.0-windows-x64.zip
     format!(
         "{}/Blender{}/blender-{}-{}-{}.{}",
-        base, major_minor, version, platform.os, platform.arch, platform.ext
+        base_url, major_minor, version, platform.os, platform.arch, platform.ext
     )
 }
 
@@ -94,10 +96,8 @@ mod tests {
         assert!(validate_version_string("..").is_err());
         assert!(validate_version_string("../5.0.0").is_err());
         assert!(validate_version_string("5.0.0/..").is_err());
-
         assert!(validate_version_string("/usr/bin").is_err());
         assert!(validate_version_string("/5.0.0").is_err());
-
         assert!(validate_version_string("subdir/5.0.0").is_err());
 
         if std::path::MAIN_SEPARATOR == '\\' {

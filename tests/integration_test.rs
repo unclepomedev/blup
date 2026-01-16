@@ -1,23 +1,33 @@
 use blup::core::{downloader, extractor};
 use reqwest::Client;
+use std::io::{Cursor, Write};
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zip::write::FileOptions;
 
 #[tokio::test]
-async fn test_download_command_with_mock() {
+async fn test_download_and_extract_flow() {
     let mock_server = MockServer::start().await;
 
-    let fixture_path = "tests/fixtures/fake_blender.zip";
-    let body = std::fs::read(fixture_path)
-        .expect("Fixture not found. Did you run 'zip tests/fixtures/fake_blender.zip ...'?");
+    let mut buffer = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(Cursor::new(&mut buffer));
+
+        let options =
+            FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+
+        zip.start_file("Blender5.0/blender.exe", options).unwrap();
+        zip.write_all(b"fake blender binary content").unwrap();
+
+        zip.finish().unwrap();
+    }
 
     Mock::given(method("GET"))
-        .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(buffer))
         .mount(&mock_server)
         .await;
 
     let temp_dir = tempfile::tempdir().unwrap();
-
     let client = Client::new();
     let url = format!("{}/fake_blender.zip", &mock_server.uri());
     let archive_path = temp_dir.path().join("downloaded.zip");
