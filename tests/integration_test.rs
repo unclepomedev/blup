@@ -1,4 +1,4 @@
-use blup::core::downloader;
+use blup::core::{downloader, extractor};
 use reqwest::Client;
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -21,12 +21,15 @@ async fn test_download_command_with_mock() {
 
     let client = Client::new();
     let url = format!("{}/fake_blender.zip", &mock_server.uri());
+    let archive_path = temp_dir.path().join("downloaded.zip");
 
-    let result = downloader::download_file(&client, &url, &dest_path).await;
+    downloader::download_file(&client, &url, &archive_path).await.unwrap();
 
-    assert!(result.is_ok(), "Download failed: {:?}", result.err());
-    assert!(dest_path.exists(), "File was not created");
+    let extract_dir = temp_dir.path().join("extracted");
+    let result = extractor::extract(&archive_path, &extract_dir);
 
-    let metadata = std::fs::metadata(dest_path).unwrap();
-    assert!(metadata.len() > 0);
+    assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
+
+    let exe_path = extract_dir.join("Blender5.0").join("blender.exe");
+    assert!(exe_path.exists(), "Extracted file not found at {:?}", exe_path);
 }
