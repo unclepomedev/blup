@@ -9,6 +9,28 @@ Works on **Windows**, **macOS**, and **Linux**.
 
 ## Installation
 
+### Automated Install
+
+```shell
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.sh | sh
+```
+
+### Windows (PowerShell)
+
+```shell
+irm https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.ps1 | iex
+```
+
+### Package Managers
+
+```shell
+brew install unclepomedev/blup/blup
+```
+
+### From cargo
+
+If you have Rust installed:
+
 ```shell
 cargo install blup
 # or

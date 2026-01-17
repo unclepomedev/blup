@@ -1,0 +1,54 @@
+name: Test Installation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-installer-script-linux:
+    name: Test Shell Script (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install via script
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.sh | sh
+      - name: Verify
+        run: |
+          source $HOME/.cargo/env
+          blup --version
+
+  test-installer-script-macos:
+    name: Test Shell Script (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Install via script
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.sh | sh
+      - name: Verify
+        run: |
+          source $HOME/.cargo/env
+          blup --version
+
+  test-homebrew:
+    name: Test Homebrew (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Install via Homebrew
+        run: |
+          brew install unclepomedev/blup/blup
+      - name: Verify
+        run: |
+          blup --version
+
+  test-installer-powershell:
+    name: Test PowerShell (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Install via script
+        shell: powershell
+        run: |
+          irm https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.ps1 | iex
+      - name: Verify
+        shell: powershell
+        run: |
+          $env:Path += ";$env:USERPROFILE\.cargo\bin"
+          blup --version
