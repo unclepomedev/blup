@@ -103,7 +103,12 @@ async fn download_and_extract(
         .split('/')
         .next_back()
         .filter(|s| !s.is_empty() && s.contains('.'))
-        .ok_or_else(|| anyhow::anyhow!("Could not determine archive filename from URL: {}", download_url))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Could not determine archive filename from URL: {}",
+                download_url
+            )
+        })?;
     let archive_path = temp_dir.path().join(archive_name);
 
     downloader::download_file(client, download_url, &archive_path).await?;
