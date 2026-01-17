@@ -69,6 +69,13 @@ enum Commands {
         #[arg(value_name = "VERSION")]
         target_version: Option<String>,
     },
+
+    /// Show the path to the Blender executable
+    Which {
+        /// The version to check (optional if context/default is set)
+        #[arg(value_name = "VERSION")]
+        target_version: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -100,6 +107,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Default { target_version } => {
             commands::default::run(target_version)?;
+        }
+        Commands::Which { target_version } => {
+            commands::which::run(target_version)?;
         }
     }
 

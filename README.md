@@ -47,6 +47,7 @@ cargo install --path .
 blup install 5.0.0                   # Download & Install
 blup default 5.0.0                   # Set global default
 blup list                            # Check installed versions
+blup which                           # Show executable path
 blup run                             # Run default version
 blup run -- file.blend --background  # Run with arguments
 ```
@@ -71,6 +72,8 @@ blup run 5.0.0
 echo "5.0.0" > .blender-version
 blup run  # Auto-detects 5.0.0 from file
 ```
+
+**Priority**: `CLI Argument` > `.blender-version` > `Global Default`
 
 ### For Developers
 
