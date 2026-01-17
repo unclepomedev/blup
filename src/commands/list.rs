@@ -51,7 +51,11 @@ fn print_installed_list(installed_versions: &HashSet<String>) {
 async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> {
     println!("{}", style("Fetching remote versions...").dim());
 
-    let client = Client::new();
+use std::time::Duration;
+...
+    let client = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()?;
     let builds = daily::fetch_daily_list(&client).await?;
     let platform = os::detect_platform()?;
 
