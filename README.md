@@ -2,7 +2,7 @@
 
 **Blender Version Manager** 🦀
 
-A cross-platform CLI tool to manage Blender versions (`rustup` for Blender).
+A CLI tool to manage Blender versions (`rustup` for Blender).
 Supports `.blender-version` files, context-aware execution, and script path injection.
 
 ## Installation
