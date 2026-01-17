@@ -22,11 +22,13 @@ fn get_installed_versions() -> Result<HashSet<String>> {
     let versions_dir = app_root.join("versions");
 
     let mut installed_versions = HashSet::new();
-    if versions_dir.exists() {
-        for entry in fs::read_dir(versions_dir)? {
+    if versions_dir.is_dir() {
+        for entry in fs::read_dir(&versions_dir)? {
             let entry = entry?;
-            if let Ok(name) = entry.file_name().into_string() {
-                installed_versions.insert(name);
+            if entry.file_type()?.is_dir() {
+                if let Ok(name) = entry.file_name().into_string() {
+                    installed_versions.insert(name);
+                }
             }
         }
     }
@@ -71,7 +73,8 @@ async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> 
         let is_lts = daily::is_lts(&build.version);
 
         let display_ver = format!("{}-{}", build.version, build.risk_id);
-        let extra_info = format!("{}, {}", note, &build.hash[..7]);
+        let hash_short = build.hash.get(0..7).unwrap_or(&build.hash);
+        let extra_info = format!("{}, {}", note, hash_short);
 
         print_remote_entry(
             &full_name,
