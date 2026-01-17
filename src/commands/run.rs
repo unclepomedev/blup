@@ -2,9 +2,11 @@ use crate::core::{config, os};
 use anyhow::{Context, Result, bail};
 use console::style;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 pub fn run(version_arg: Option<String>, scripts: Option<String>, args: Vec<String>) -> Result<()> {
+    let (version_arg, args) = prepare_run_args(version_arg, args);
     let version = config::resolve_version(version_arg)?;
 
     let app_root = config::get_app_root()?;
@@ -42,4 +44,57 @@ pub fn run(version_arg: Option<String>, scripts: Option<String>, args: Vec<Strin
     }
 
     Ok(())
+}
+
+fn prepare_run_args(
+    target_version: Option<String>,
+    args: Vec<String>,
+) -> (Option<String>, Vec<String>) {
+    if let Some(ref v) = target_version {
+        let is_blend_file = v.to_lowercase().ends_with(".blend");
+        let exists_as_file = Path::new(v).is_file();
+
+        if is_blend_file || exists_as_file {
+            let mut new_args = args;
+            new_args.insert(0, v.clone());
+            return (None, new_args);
+        }
+    }
+    (target_version, args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_prepare_run_args_with_blend_extension() {
+        let (ver, args) = prepare_run_args(
+            Some("mycheck.blend".to_string()),
+            vec!["--background".to_string()],
+        );
+        assert_eq!(ver, None);
+        assert_eq!(args, vec!["mycheck.blend", "--background"]);
+    }
+
+    #[test]
+    fn test_prepare_run_args_with_existing_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("script.py");
+        File::create(&file_path).unwrap();
+        let path_str = file_path.to_str().unwrap().to_string();
+
+        let (ver, args) = prepare_run_args(Some(path_str.clone()), vec![]);
+        assert_eq!(ver, None);
+        assert_eq!(args, vec![path_str]);
+    }
+
+    #[test]
+    fn test_prepare_run_args_with_version() {
+        let (ver, args) = prepare_run_args(Some("4.0.0".to_string()), vec![]);
+        assert_eq!(ver, Some("4.0.0".to_string()));
+        assert!(args.is_empty());
+    }
 }
