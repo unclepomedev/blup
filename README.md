@@ -1,5 +1,9 @@
 # blup
 
+[![Crates.io](https://img.shields.io/crates/v/blup.svg)](https://crates.io/crates/blup)
+[![CI](https://github.com/unclepomedev/blup/actions/workflows/release.yml/badge.svg)](https://github.com/unclepomedev/blup/actions)
+[![License](https://img.shields.io/crates/l/blup.svg)](https://github.com/unclepomedev/blup/blob/main/LICENSE)
+
 **Blender Version Manager** 🦀
 
 A CLI tool to manage Blender versions (`rustup` for Blender).
@@ -9,22 +13,18 @@ Works on **Windows**, **macOS**, and **Linux**.
 
 ## Installation
 
-### Automated Install
+### macOS/Linux (Automated Install or Package Managers)
 
 ```shell
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.sh | sh
+# or
+brew install unclepomedev/blup/blup
 ```
 
 ### Windows (PowerShell)
 
-```shell
+```powershell
 irm https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.ps1 | iex
-```
-
-### Package Managers
-
-```shell
-brew install unclepomedev/blup/blup
 ```
 
 ### From cargo
