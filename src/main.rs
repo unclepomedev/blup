@@ -18,6 +18,10 @@ enum Commands {
         /// The version to install (e.g. "5.0.0", "4.2.0")
         #[arg(value_name = "VERSION")]
         target_version: String,
+
+        /// Install from daily builds (experimental)
+        #[arg(long)]
+        daily: bool,
     },
 
     /// List installed Blender versions
@@ -68,8 +72,11 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Install { target_version } => {
-            commands::install::run(target_version).await?;
+        Commands::Install {
+            target_version,
+            daily,
+        } => {
+            commands::install::run(target_version, daily).await?;
         }
         Commands::List => {
             commands::list::run()?;
