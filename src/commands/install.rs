@@ -102,7 +102,8 @@ async fn download_and_extract(
     let archive_name = download_url
         .split('/')
         .next_back()
-        .unwrap_or("blender_archive");
+        .filter(|s| !s.is_empty() && s.contains('.'))
+        .ok_or_else(|| anyhow::anyhow!("Could not determine archive filename from URL: {}", download_url))?;
     let archive_path = temp_dir.path().join(archive_name);
 
     downloader::download_file(client, download_url, &archive_path).await?;
