@@ -5,9 +5,13 @@
 A CLI tool to manage Blender versions (`rustup` for Blender).
 Supports `.blender-version` files, context-aware execution, and script path injection.
 
+Works on **Windows**, **macOS**, and **Linux**.
+
 ## Installation
 
 ```shell
+cargo install blup
+# or
 git clone https://github.com/unclepomedev/blup.git
 cd blup
 cargo install --path .
@@ -52,6 +56,12 @@ export BLUP_MIRROR_URL=https://mirror.example.com/blender/release
 # Windows (PowerShell)
 $env:BLUP_MIRROR_URL="https://mirror.example.com/blender/release"
 ````
+
+### Storage Location
+
+* **Linux**: `~/.local/share/blup/versions`
+* **macOS**: `~/Library/Application Support/blup/versions`
+* **Windows**: `%LOCALAPPDATA%\blup\versions`
 
 ### Uninstall
 
