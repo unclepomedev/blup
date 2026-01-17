@@ -34,3 +34,4 @@ walkdir = "2.5.0"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+allow-dirty = ["ci"]
