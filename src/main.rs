@@ -26,7 +26,11 @@ enum Commands {
 
     /// List installed Blender versions
     #[command(visible_alias = "ls")]
-    List,
+    List {
+        /// List remote versions available for download
+        #[arg(long, short = 'r')]
+        remote: bool,
+    },
 
     /// Run a specific version of Blender
     Run {
@@ -78,8 +82,8 @@ async fn main() -> anyhow::Result<()> {
         } => {
             commands::install::run(target_version, daily).await?;
         }
-        Commands::List => {
-            commands::list::run()?;
+        Commands::List { remote } => {
+            commands::list::run(remote).await?;
         }
         Commands::Run {
             target_version,
