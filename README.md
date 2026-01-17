@@ -24,7 +24,7 @@ brew install unclepomedev/blup/blup
 ### Windows (PowerShell)
 
 ```powershell
-irm https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/unclepomedev/blup/releases/latest/download/blup-installer.ps1 | iex"
 ```
 
 ### From cargo
