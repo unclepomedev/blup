@@ -25,10 +25,10 @@ fn get_installed_versions() -> Result<HashSet<String>> {
     if versions_dir.is_dir() {
         for entry in fs::read_dir(&versions_dir)? {
             let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                if let Ok(name) = entry.file_name().into_string() {
-                    installed_versions.insert(name);
-                }
+            if entry.file_type()?.is_dir()
+                && let Ok(name) = entry.file_name().into_string()
+            {
+                installed_versions.insert(name);
             }
         }
     }

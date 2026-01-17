@@ -28,9 +28,9 @@ pub struct RemoteSection {
 const LTS_VERSIONS: &[&str] = &["3.3", "3.6", "4.2", "4.5"]; // ignore 2.93, 2.83
 
 pub fn is_lts(version: &str) -> bool {
-    LTS_VERSIONS.iter().any(|&lts| {
-        version == lts || version.starts_with(&format!("{}.", lts))
-    })
+    LTS_VERSIONS
+        .iter()
+        .any(|&lts| version == lts || version.starts_with(&format!("{}.", lts)))
 }
 
 pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
