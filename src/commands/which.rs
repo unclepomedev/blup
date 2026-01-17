@@ -7,7 +7,7 @@ pub fn run(target_version: Option<String>) -> Result<()> {
     let app_root = config::get_app_root()?;
     let install_dir = app_root.join("versions").join(&version);
 
-    if !install_dir.exists() {
+    if !install_dir.is_dir() {
         bail!(
             "Blender {} is not installed. Run `blup install {}` first.",
             version,
