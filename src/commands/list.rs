@@ -4,6 +4,7 @@ use console::style;
 use reqwest::Client;
 use std::collections::HashSet;
 use std::fs;
+use std::time::Duration;
 
 pub async fn run(remote: bool) -> Result<()> {
     let installed_versions = get_installed_versions()?;
@@ -51,11 +52,7 @@ fn print_installed_list(installed_versions: &HashSet<String>) {
 async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> {
     println!("{}", style("Fetching remote versions...").dim());
 
-use std::time::Duration;
-...
-    let client = Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()?;
+    let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
     let builds = daily::fetch_daily_list(&client).await?;
     let platform = os::detect_platform()?;
 
