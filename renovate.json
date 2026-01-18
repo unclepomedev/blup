@@ -6,8 +6,8 @@
     ":maintainLockFilesWeekly"
   ],
   "labels": ["dependencies"],
-  "rust": {
-    "fileMatch": ["^Cargo.toml$"]
+  "cargo": {
+    "fileMatch": ["(^|/)Cargo\\.toml$"]
   },
   "packageRules": [
     {
