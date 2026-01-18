@@ -40,7 +40,15 @@ pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Resu
     Ok(())
 }
 
-pub fn verify_checksum(file_path: &Path, expected_checksum: &str) -> Result<()> {
+pub async fn verify_checksum(file_path: &Path, expected_checksum: &str) -> Result<()> {
+    let file_path = file_path.to_path_buf();
+    let expected_checksum = expected_checksum.to_string();
+
+    tokio::task::spawn_blocking(move || verify_checksum_sync(&file_path, &expected_checksum))
+        .await?
+}
+
+fn verify_checksum_sync(file_path: &Path, expected_checksum: &str) -> Result<()> {
     let mut file = std::fs::File::open(file_path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0; 8192];
@@ -69,11 +77,14 @@ pub fn verify_checksum(file_path: &Path, expected_checksum: &str) -> Result<()> 
 
 pub fn find_checksum_in_list(list_content: &str, target_filename: &str) -> Option<String> {
     for line in list_content.lines() {
-        if line.contains(target_filename)
-            && let Some(hash) = line.split_whitespace().next()
-            && hash.len() == 64
-        {
-            return Some(hash.to_string());
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let hash = parts[0];
+            let filename = parts[1];
+
+            if filename == target_filename && hash.len() == 64 {
+                return Some(hash.to_string());
+            }
         }
     }
     None
@@ -106,26 +117,26 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    #[test]
-    fn test_verify_checksum_match() -> Result<()> {
+    #[tokio::test]
+    async fn test_verify_checksum_match() -> Result<()> {
         let mut temp_file = NamedTempFile::new()?;
         write!(temp_file, "hello world")?;
 
         let expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
 
-        verify_checksum(temp_file.path(), expected)?;
+        verify_checksum(temp_file.path(), expected).await?;
 
         Ok(())
     }
 
-    #[test]
-    fn test_verify_checksum_mismatch() -> Result<()> {
+    #[tokio::test]
+    async fn test_verify_checksum_mismatch() -> Result<()> {
         let mut temp_file = NamedTempFile::new()?;
         write!(temp_file, "malicious content")?;
 
         let expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
 
-        let result = verify_checksum(temp_file.path(), expected);
+        let result = verify_checksum(temp_file.path(), expected).await;
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -152,9 +163,6 @@ mod tests {
         assert_eq!(hash_none, None);
 
         let hash_partial = find_checksum_in_list(content, "blender-5.0.1-linux-x64");
-        assert_eq!(
-            hash_partial,
-            Some("8019580ee1b7262e505f4196a00237ccf743c88d205b38d34201510676e60b09".to_string())
-        );
+        assert_eq!(hash_partial, None);
     }
 }

@@ -136,7 +136,7 @@ async fn download_verify_extract(
     if !skip_checksum {
         if let Some(checksum) = expected_checksum {
             println!("  {} Verifying checksum...", style("->").dim());
-            downloader::verify_checksum(&archive_path, &checksum)?;
+            downloader::verify_checksum(&archive_path, &checksum).await?;
             println!("  {} Checksum OK", style("->").green());
         } else {
             println!(
@@ -151,6 +151,9 @@ async fn download_verify_extract(
     println!("  {} Extracting...", style("->").dim());
     fs::create_dir_all(install_dir)?;
 
-    extractor::extract(&archive_path, install_dir)?;
+    if let Err(e) = extractor::extract(&archive_path, install_dir) {
+        let _ = fs::remove_dir_all(install_dir);
+        return Err(e);
+    }
     Ok(())
 }
