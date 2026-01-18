@@ -53,8 +53,9 @@ fn prepare_run_args(
     if let Some(ref v) = target_version {
         let is_blend_file = v.to_lowercase().ends_with(".blend");
         let exists_as_file = Path::new(v).is_file();
+        let is_flag = v.starts_with('-');
 
-        if is_blend_file || exists_as_file {
+        if is_blend_file || exists_as_file || is_flag {
             let mut new_args = args;
             new_args.insert(0, v.clone());
             return (None, new_args);
@@ -96,5 +97,15 @@ mod tests {
         let (ver, args) = prepare_run_args(Some("4.0.0".to_string()), vec![]);
         assert_eq!(ver, Some("4.0.0".to_string()));
         assert!(args.is_empty());
+    }
+
+    #[test]
+    fn test_prepare_run_args_with_flag() {
+        let (ver, args) = prepare_run_args(
+            Some("--background".to_string()),
+            vec!["--version".to_string()],
+        );
+        assert_eq!(ver, None);
+        assert_eq!(args, vec!["--background", "--version"]);
     }
 }
