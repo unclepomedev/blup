@@ -175,7 +175,7 @@ dependencies = [
 
 [[package]]
 name = "blup"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "assert_cmd",
