@@ -3,6 +3,8 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
+use std::env;
+use std::io::IsTerminal;
 use std::io::Read;
 use std::path::Path;
 use tokio::fs::File;
@@ -91,6 +93,12 @@ pub fn find_checksum_in_list(list_content: &str, target_filename: &str) -> Optio
 }
 
 fn create_progress_bar(len: Option<u64>) -> Result<ProgressBar> {
+    let is_ci = env::var("CI").is_ok();
+    let is_terminal = std::io::stderr().is_terminal();
+    if is_ci || !is_terminal {
+        return Ok(ProgressBar::hidden());
+    }
+
     let pb = match len {
         Some(len) => {
             let pb = ProgressBar::new(len);
