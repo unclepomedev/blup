@@ -6,15 +6,15 @@ use reqwest::Client;
 use std::fs;
 use std::path::Path;
 
-pub async fn run(target_version: String, is_daily: bool) -> Result<()> {
+pub async fn run(target_version: String, is_daily: bool, skip_checksum: bool) -> Result<()> {
     let app_root = config::get_app_root()?;
     let client = Client::new();
     let platform = os::detect_platform()?;
 
-    let (download_url, version_name) = if is_daily {
+    let (download_url, version_name, expected_checksum) = if is_daily {
         resolve_daily_version(&client, &target_version, &platform).await?
     } else {
-        resolve_stable_version(&target_version, &platform)
+        resolve_stable_version(&client, &target_version, &platform).await?
     };
 
     let install_dir = app_root.join("versions").join(&version_name);
@@ -35,7 +35,14 @@ pub async fn run(target_version: String, is_daily: bool) -> Result<()> {
         version_name
     );
 
-    download_and_extract(&client, &download_url, &install_dir).await?;
+    download_verify_extract(
+        &client,
+        &download_url,
+        &install_dir,
+        skip_checksum,
+        expected_checksum,
+    )
+    .await?;
 
     println!(
         "\n{} Blender {} installed successfully! 🎉",
@@ -54,16 +61,36 @@ pub async fn run(target_version: String, is_daily: bool) -> Result<()> {
     Ok(())
 }
 
-fn resolve_stable_version(target_version: &str, platform: &os::Platform) -> (String, String) {
-    let url = version::build_url(version::OFFICIAL_URL, target_version, platform);
-    (url, target_version.to_string())
+async fn resolve_stable_version(
+    client: &Client,
+    target_version: &str,
+    platform: &os::Platform,
+) -> Result<(String, String, Option<String>)> {
+    let download_url = version::build_url(version::OFFICIAL_URL, target_version, platform);
+    let target_filename = version::extract_filename_from_url(&download_url).unwrap_or_default();
+
+    let checksum_url = version::build_checksum_list_url(version::OFFICIAL_URL, target_version);
+
+    let checksum = match client.get(&checksum_url).send().await {
+        Ok(res) if res.status().is_success() => {
+            let content = res.text().await.unwrap_or_default();
+            if !target_filename.is_empty() {
+                downloader::find_checksum_in_list(&content, &target_filename)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    Ok((download_url, target_version.to_string(), checksum))
 }
 
 async fn resolve_daily_version(
     client: &Client,
     target_version: &str,
     platform: &os::Platform,
-) -> Result<(String, String)> {
+) -> Result<(String, String, Option<String>)> {
     println!(
         "{} Fetching daily build list for '{}'...",
         style("==>").green(),
@@ -88,30 +115,38 @@ async fn resolve_daily_version(
             .format("%Y-%m-%d")
     );
 
-    Ok((best_match.url, folder_name))
+    Ok((best_match.url, folder_name, Some(best_match.checksum)))
 }
 
-async fn download_and_extract(
+async fn download_verify_extract(
     client: &Client,
     download_url: &str,
     install_dir: &Path,
+    skip_checksum: bool,
+    expected_checksum: Option<String>,
 ) -> Result<()> {
     println!("  {} Fetching from: {}", style("->").dim(), download_url);
 
     let temp_dir = tempfile::tempdir()?;
-    let archive_name = download_url
-        .split('/')
-        .next_back()
-        .filter(|s| !s.is_empty() && s.contains('.'))
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Could not determine archive filename from URL: {}",
-                download_url
-            )
-        })?;
+    let archive_name = version::extract_filename_from_url(download_url)?;
     let archive_path = temp_dir.path().join(archive_name);
 
     downloader::download_file(client, download_url, &archive_path).await?;
+
+    if !skip_checksum {
+        if let Some(checksum) = expected_checksum {
+            println!("  {} Verifying checksum...", style("->").dim());
+            downloader::verify_checksum(&archive_path, &checksum)?;
+            println!("  {} Checksum OK", style("->").green());
+        } else {
+            println!(
+                "  {} No checksum found (skipping verification)",
+                style("!").yellow()
+            );
+        }
+    } else {
+        println!("  {} Checksum verification skipped", style("!").yellow());
+    }
 
     println!("  {} Extracting...", style("->").dim());
     fs::create_dir_all(install_dir)?;

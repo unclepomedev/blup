@@ -1,9 +1,17 @@
 use crate::core::os::Platform;
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use std::env;
 use std::path::{Component, Path};
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
+
+pub fn extract_filename_from_url(url: &str) -> Result<String> {
+    url.split('/')
+        .next_back()
+        .filter(|s| !s.is_empty() && s.contains('.'))
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow!("Could not determine archive filename from URL: {}", url))
+}
 
 pub fn validate_version_string(v: &str) -> Result<()> {
     let path = Path::new(v);
@@ -40,6 +48,26 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     format!(
         "{}/Blender{}/blender-{}-{}-{}.{}",
         base_url, major_minor, version, platform.os, platform.arch, platform.ext
+    )
+}
+
+pub fn build_checksum_list_url(base: &str, version: &str) -> String {
+    let base_url = env::var("BLUP_MIRROR_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| base.to_string());
+
+    let parts: Vec<&str> = version.split('.').collect();
+    let major_minor = if parts.len() >= 2 {
+        format!("{}.{}", parts[0], parts[1])
+    } else {
+        version.to_string()
+    };
+
+    format!(
+        "{}/Blender{}/blender-{}.sha256",
+        base_url, major_minor, version
     )
 }
 
@@ -134,5 +162,36 @@ mod tests {
             url,
             "https://mirror.example.com/Blender4.5/blender-4.5.0-windows-x64.zip"
         );
+    }
+
+    #[test]
+    fn test_build_checksum_list_url() {
+        let url = build_checksum_list_url(OFFICIAL_URL, "5.0.1");
+        assert_eq!(
+            url,
+            "https://download.blender.org/release/Blender5.0/blender-5.0.1.sha256"
+        );
+
+        let url_old = build_checksum_list_url(OFFICIAL_URL, "3.6.23");
+        assert_eq!(
+            url_old,
+            "https://download.blender.org/release/Blender3.6/blender-3.6.23.sha256"
+        );
+    }
+
+    #[test]
+    fn test_extract_filename_from_url() {
+        // ✅
+        let url = "https://example.com/download/blender-4.2.0.zip";
+        assert_eq!(extract_filename_from_url(url).unwrap(), "blender-4.2.0.zip");
+
+        // ❌
+        let url_no_ext = "https://example.com/download/blender";
+        assert!(extract_filename_from_url(url_no_ext).is_err());
+
+        let url_slash = "https://example.com/download/";
+        assert!(extract_filename_from_url(url_slash).is_err());
+
+        assert!(extract_filename_from_url("").is_err());
     }
 }
