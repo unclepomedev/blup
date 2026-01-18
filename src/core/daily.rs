@@ -17,7 +17,8 @@ pub struct DailyBuild {
     pub file_name: String,
     pub file_mtime: u64,
     pub file_extension: String,
-    pub checksum: String,
+    #[serde(default)]
+    pub checksum: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -115,7 +115,7 @@ async fn resolve_daily_version(
             .format("%Y-%m-%d")
     );
 
-    Ok((best_match.url, folder_name, Some(best_match.checksum)))
+    Ok((best_match.url, folder_name, best_match.checksum))
 }
 
 async fn download_verify_extract(
