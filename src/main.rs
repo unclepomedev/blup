@@ -22,6 +22,10 @@ enum Commands {
         /// Install from daily builds (experimental)
         #[arg(long)]
         daily: bool,
+
+        /// Skip checksum verification
+        #[arg(long)]
+        skip_checksum: bool,
     },
 
     /// List installed Blender versions
@@ -86,8 +90,9 @@ async fn main() -> anyhow::Result<()> {
         Commands::Install {
             target_version,
             daily,
+            skip_checksum,
         } => {
-            commands::install::run(target_version, daily).await?;
+            commands::install::run(target_version, daily, skip_checksum).await?;
         }
         Commands::List { remote } => {
             commands::list::run(remote).await?;
