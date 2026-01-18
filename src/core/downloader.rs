@@ -94,7 +94,7 @@ pub fn find_checksum_in_list(list_content: &str, target_filename: &str) -> Optio
 
 fn create_progress_bar(len: Option<u64>) -> Result<ProgressBar> {
     let is_ci = env::var("CI").is_ok();
-    let is_terminal = std::io::stdout().is_terminal();
+    let is_terminal = std::io::stderr().is_terminal();
     if is_ci || !is_terminal {
         return Ok(ProgressBar::hidden());
     }
