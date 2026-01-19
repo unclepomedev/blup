@@ -17,7 +17,7 @@ enum Commands {
     Install {
         /// The version to install (e.g. "5.0.0", "4.2.0")
         #[arg(value_name = "VERSION")]
-        target_version: String,
+        target_version: Option<String>,
 
         /// Install from daily builds (experimental)
         #[arg(long)]

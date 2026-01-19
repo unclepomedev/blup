@@ -61,3 +61,56 @@ fn test_install_default_flag_existing_version() -> Result<(), Box<dyn std::error
 
     Ok(())
 }
+
+#[test]
+fn test_install_no_args_no_file() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root).current_dir(root).arg("install");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("No version specified"));
+
+    Ok(())
+}
+
+#[test]
+fn test_install_from_file() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+    let versions_dir = root.join("versions");
+
+    fs::create_dir_all(versions_dir.join("5.0.0"))?;
+
+    fs::write(root.join(".blender-version"), "5.0.0")?;
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root).current_dir(root).arg("install");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Found .blender-version: 5.0.0"))
+        .stdout(predicate::str::contains("already installed"));
+
+    Ok(())
+}
+
+#[test]
+fn test_install_from_file_invalid() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    fs::write(root.join(".blender-version"), "../invalid")?;
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root).current_dir(root).arg("install");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("not a valid version string"));
+
+    Ok(())
+}
