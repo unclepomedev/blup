@@ -70,7 +70,10 @@ blup run 5.0.0
 
 # Pin version for project (Context Aware)
 echo "5.0.0" > .blender-version
-blup run  # Auto-detects 5.0.0 from file
+
+# Install & Run (Auto-detects from file)
+blup install  # Like 'npm install'
+blup run
 ```
 
 **Priority**: `CLI Argument` > `.blender-version` > `Global Default`
