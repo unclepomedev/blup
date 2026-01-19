@@ -23,6 +23,10 @@ enum Commands {
         #[arg(long)]
         daily: bool,
 
+        /// Set as default version after installation
+        #[arg(long)]
+        default: bool,
+
         /// Skip checksum verification
         #[arg(long)]
         skip_checksum: bool,
@@ -90,9 +94,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Install {
             target_version,
             daily,
+            default,
             skip_checksum,
         } => {
-            commands::install::run(target_version, daily, skip_checksum).await?;
+            commands::install::run(target_version, daily, default, skip_checksum).await?;
         }
         Commands::List { remote } => {
             commands::list::run(remote).await?;

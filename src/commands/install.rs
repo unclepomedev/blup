@@ -6,7 +6,12 @@ use reqwest::Client;
 use std::fs;
 use std::path::Path;
 
-pub async fn run(target_version: String, is_daily: bool, skip_checksum: bool) -> Result<()> {
+pub async fn run(
+    target_version: String,
+    is_daily: bool,
+    set_default: bool,
+    skip_checksum: bool,
+) -> Result<()> {
     let app_root = config::get_app_root()?;
     let client = Client::new();
     let platform = os::detect_platform()?;
@@ -26,6 +31,9 @@ pub async fn run(target_version: String, is_daily: bool, skip_checksum: bool) ->
             version_name,
             install_dir
         );
+        if set_default {
+            super::default::run(Some(version_name))?;
+        }
         return Ok(());
     }
 
@@ -51,7 +59,9 @@ pub async fn run(target_version: String, is_daily: bool, skip_checksum: bool) ->
     );
     println!("    Location: {:?}", install_dir);
 
-    if is_daily {
+    if set_default {
+        super::default::run(Some(version_name))?;
+    } else if is_daily {
         println!(
             "    To run this version: {}",
             style(format!("blup run {}", version_name)).yellow()
