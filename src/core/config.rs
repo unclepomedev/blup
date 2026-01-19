@@ -74,7 +74,7 @@ pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<S
             );
         }
 
-        println!(
+        eprintln!(
             "{} Found .blender-version: {}",
             console::style("i").blue(),
             v

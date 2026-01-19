@@ -64,10 +64,8 @@ fn test_list_active_vs_default() -> Result<(), Box<dyn std::error::Error>> {
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("• 4.5.3"))
-        .stdout(predicate::str::contains("(default)"))
-        .stdout(predicate::str::contains("* 4.5.4"))
-        .stdout(predicate::str::contains("(active)"));
+        .stdout(predicate::str::is_match(r"•\s+4\.5\.3.*\(default\)")?)
+        .stdout(predicate::str::is_match(r"\*\s+4\.5\.4.*\(active\)")?);
 
     Ok(())
 }
