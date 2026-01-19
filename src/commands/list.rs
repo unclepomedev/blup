@@ -37,6 +37,9 @@ fn get_installed_versions() -> Result<HashSet<String>> {
 }
 
 fn print_installed_list(installed_versions: &HashSet<String>) {
+    let settings = config::load().unwrap_or_default();
+    let default_ver = settings.default_version.as_deref().unwrap_or("");
+
     println!("{}", style("Installed Blender Versions:").bold());
     if installed_versions.is_empty() {
         println!("  (No versions installed)");
@@ -44,7 +47,16 @@ fn print_installed_list(installed_versions: &HashSet<String>) {
         let mut v_list: Vec<_> = installed_versions.iter().collect();
         v_list.sort();
         for v in v_list {
-            println!("  {}", v);
+            if v == default_ver {
+                println!(
+                    "  {} {} {}",
+                    style("*").green().bold(),
+                    style(v).green().bold(),
+                    style("(default)").dim()
+                );
+            } else {
+                println!("  {} {}", style("•").dim(), v);
+            }
         }
     }
 }
