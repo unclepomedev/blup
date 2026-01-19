@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use crate::core::version;
+use anyhow::{Context, Result, bail};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -48,23 +49,45 @@ pub fn save(settings: &Settings) -> Result<()> {
     Ok(())
 }
 
-pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
+pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<String>> {
     if let Some(v) = arg_version {
-        return Ok(v);
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!("Provided version '{}' is invalid. Reason: {}", v, e);
+        }
+        return Ok(Some(v));
     }
 
     let local_file = Path::new(".blender-version");
     if local_file.exists() {
         let content = fs::read_to_string(local_file).context("Failed to read .blender-version")?;
         let v = content.trim().to_string();
-        if !v.is_empty() {
-            println!(
-                "{} Found .blender-version: {}",
-                console::style("i").blue(),
-                v
-            );
-            return Ok(v);
+
+        if v.is_empty() {
+            bail!("Found .blender-version but it is empty.");
         }
+
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!(
+                "Found .blender-version but content '{}' is not a valid version string. Reason: {}",
+                v,
+                e
+            );
+        }
+
+        println!(
+            "{} Found .blender-version: {}",
+            console::style("i").blue(),
+            v
+        );
+        return Ok(Some(v));
+    }
+
+    Ok(None)
+}
+
+pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
+    if let Some(v) = resolve_from_args_or_file(arg_version)? {
+        return Ok(v);
     }
 
     let settings = load()?;
@@ -72,7 +95,7 @@ pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
         return Ok(v);
     }
 
-    anyhow::bail!(
+    bail!(
         "No version specified. Use `blup run <version>` or set a default with `blup default <version>`."
     );
 }
