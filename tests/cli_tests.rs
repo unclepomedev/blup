@@ -46,7 +46,7 @@ fn test_install_default_flag_existing_version() -> Result<(), Box<dyn std::error
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
     cmd.env("BLUP_ROOT", root)
-        .args(&["install", "3.6.0", "--default"]);
+        .args(["install", "3.6.0", "--default"]);
 
     cmd.assert()
         .success()
