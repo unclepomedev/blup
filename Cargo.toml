@@ -1,6 +1,6 @@
 [package]
 name = "blup"
-version = "0.0.9"
+version = "0.1.0"
 authors = ["unclepomedev <unclepome.dev@gmail.com>"]
 description = "The Blender Version Manager"
 edition = "2024"
