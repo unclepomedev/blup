@@ -171,6 +171,9 @@ async fn download_verify_extract(
 
 fn resolve_install_target(arg: Option<String>) -> Result<String> {
     if let Some(v) = arg {
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!("Provided version '{}' is invalid. Reason: {}", v, e);
+        }
         return Ok(v);
     }
 
