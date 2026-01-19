@@ -127,7 +127,7 @@ fn test_install_from_file() -> Result<(), Box<dyn std::error::Error>> {
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Found .blender-version: 5.0.0"))
+        .stderr(predicate::str::contains("Found .blender-version: 5.0.0"))
         .stdout(predicate::str::contains("already installed"));
 
     Ok(())
