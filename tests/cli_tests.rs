@@ -23,7 +23,7 @@ fn test_list_formatting() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
-    cmd.env("BLUP_ROOT", root).arg("list");
+    cmd.env("BLUP_ROOT", root).current_dir(root).arg("list");
 
     cmd.assert()
         .success()
@@ -31,6 +31,43 @@ fn test_list_formatting() -> Result<(), Box<dyn std::error::Error>> {
         .stdout(predicate::str::contains("* 5.0.0 (default)")) // Green color codes might make exact match hard, but text should be there
         .stdout(predicate::str::contains("• 4.5.1"))
         .stdout(predicate::str::contains("• 5.1.0-alpha"));
+
+    Ok(())
+}
+
+#[test]
+fn test_list_active_vs_default() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+    let versions_dir = root.join("versions");
+    fs::create_dir_all(&versions_dir)?;
+
+    // Create fake versions
+    fs::create_dir(versions_dir.join("4.5.3"))?;
+    fs::create_dir(versions_dir.join("4.5.4"))?;
+
+    // Create config with default = 4.5.3
+    let config_dir = root.join("config");
+    fs::create_dir_all(&config_dir)?;
+    fs::write(
+        config_dir.join("settings.toml"),
+        r#"default_version = "4.5.3""#,
+    )?;
+
+    // Create .blender-version with 4.5.4 (Override)
+    fs::write(root.join(".blender-version"), "4.5.4")?;
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root)
+        .current_dir(root) // Important to pick up .blender-version
+        .arg("list");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("• 4.5.3"))
+        .stdout(predicate::str::contains("(default)"))
+        .stdout(predicate::str::contains("* 4.5.4"))
+        .stdout(predicate::str::contains("(active)"));
 
     Ok(())
 }
