@@ -104,6 +104,10 @@ $env:BLUP_MIRROR_URL="https://mirror.example.com/blender/release"
 blup remove 4.2.0
 ```
 
+## CI / GitHub Actions
+
+For automated testing and CI/CD workflows, use the official GitHub Action: [setup-blup](https://github.com/unclepomedev/setup-blup).
+
 ## License
 
 MIT License
