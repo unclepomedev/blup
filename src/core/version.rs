@@ -19,11 +19,11 @@ pub fn validate_version_string(v: &str) -> Result<()> {
 
     match components.next() {
         Some(Component::Normal(_)) => {}
-        _ => bail!("Invalid version string: {}", v),
+        _ => bail!("'{}' is not a valid version string", v),
     }
 
     if components.next().is_some() {
-        bail!("Invalid version string: {}", v);
+        bail!("'{}' is not a valid version string", v);
     }
 
     Ok(())

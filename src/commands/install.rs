@@ -1,5 +1,5 @@
 use crate::core::{config, daily, downloader, extractor, os, version};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use chrono::DateTime;
 use console::style;
 use reqwest::Client;
@@ -7,11 +7,12 @@ use std::fs;
 use std::path::Path;
 
 pub async fn run(
-    target_version: String,
+    target_version: Option<String>,
     is_daily: bool,
     set_default: bool,
     skip_checksum: bool,
 ) -> Result<()> {
+    let target_version = resolve_install_target(target_version)?;
     let app_root = config::get_app_root()?;
     let client = Client::new();
     let platform = os::detect_platform()?;
@@ -166,4 +167,33 @@ async fn download_verify_extract(
         return Err(e);
     }
     Ok(())
+}
+
+fn resolve_install_target(arg: Option<String>) -> Result<String> {
+    if let Some(v) = arg {
+        return Ok(v);
+    }
+
+    let local_file = Path::new(".blender-version");
+    if local_file.exists() {
+        let content = fs::read_to_string(local_file)?;
+        let v = content.trim().to_string();
+
+        if v.is_empty() {
+            bail!("Found .blender-version but it is empty.");
+        }
+
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!(
+                "Found .blender-version but content '{}' is invalid. Reason: {}",
+                v,
+                e
+            );
+        }
+
+        println!("{} Found .blender-version: {}", style("i").blue(), v);
+        return Ok(v);
+    }
+
+    bail!("No version specified and no .blender-version file found.");
 }
