@@ -77,6 +77,15 @@ pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> Remote
     RemoteSection { stable, daily }
 }
 
+fn normalize_daily_builds(builds: &mut [DailyBuild]) {
+    for build in builds {
+        // Fix for Linux daily builds having "xz" extension instead of "tar.xz"
+        if build.platform == "linux" && build.file_extension == "xz" {
+            build.file_extension = "tar.xz".to_string();
+        }
+    }
+}
+
 pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
     let response = client
         .get(DAILY_JSON_URL)
@@ -85,10 +94,12 @@ pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
         .error_for_status()
         .context("Failed to fetch daily builds JSON")?;
 
-    let builds: Vec<DailyBuild> = response
+    let mut builds: Vec<DailyBuild> = response
         .json()
         .await
         .context("Failed to parse daily builds JSON")?;
+
+    normalize_daily_builds(&mut builds);
 
     Ok(builds)
 }
@@ -204,5 +215,42 @@ mod tests {
         assert!(is_lts("4.2.10"));
         assert!(!is_lts("2.83.0"));
         assert!(!is_lts("5.0.0"));
+    }
+
+    #[test]
+    fn test_normalize_daily_builds() {
+        let mut builds = vec![
+            DailyBuild {
+                url: "url".to_string(),
+                version: "5.0".to_string(),
+                risk_id: "daily".to_string(),
+                branch: "main".to_string(),
+                hash: "hash".to_string(),
+                platform: "linux".to_string(),
+                architecture: "x86_64".to_string(),
+                file_name: "blender.tar.xz".to_string(),
+                file_mtime: 0,
+                file_extension: "xz".to_string(),
+                checksum: None,
+            },
+            DailyBuild {
+                url: "url".to_string(),
+                version: "5.0".to_string(),
+                risk_id: "daily".to_string(),
+                branch: "main".to_string(),
+                hash: "hash".to_string(),
+                platform: "windows".to_string(),
+                architecture: "x64".to_string(),
+                file_name: "blender.zip".to_string(),
+                file_mtime: 0,
+                file_extension: "zip".to_string(),
+                checksum: None,
+            },
+        ];
+
+        normalize_daily_builds(&mut builds);
+
+        assert_eq!(builds[0].file_extension, "tar.xz");
+        assert_eq!(builds[1].file_extension, "zip");
     }
 }
