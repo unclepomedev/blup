@@ -287,6 +287,22 @@ jobs:
         run: |
           # Remove the granular manifests
           rm -f artifacts/*-dist-manifest.json
+      - name: Generate Installer Checksums
+        shell: bash
+        run: |
+          cd artifacts
+          
+          # Linux/macOS Installer
+          if [ -f "blup-installer.sh" ]; then
+            shasum -a 256 blup-installer.sh > blup-installer.sh.sha256
+            echo "Generated blup-installer.sh.sha256"
+          fi
+          
+          # Windows Installer
+          if [ -f "blup-installer.ps1" ]; then
+            shasum -a 256 blup-installer.ps1 > blup-installer.ps1.sha256
+            echo "Generated blup-installer.ps1.sha256"
+          fi
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
