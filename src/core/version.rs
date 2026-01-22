@@ -1,7 +1,11 @@
 use crate::core::os::Platform;
-use anyhow::{Result, anyhow, bail};
+use crate::core::{config, daily};
+use anyhow::{Context, Result, anyhow, bail};
+use std::cmp::Ordering;
 use std::env;
+use std::fs;
 use std::path::{Component, Path};
+use std::time::SystemTime;
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
 
@@ -30,11 +34,7 @@ pub fn validate_version_string(v: &str) -> Result<()> {
 }
 
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
-    let base_url = env::var("BLUP_MIRROR_URL")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| base.to_string());
+    let base_url = get_base_url(base);
 
     // version: "5.0.0" -> major_minor: "5.0"
     let parts: Vec<&str> = version.split('.').collect();
@@ -52,11 +52,7 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
 }
 
 pub fn build_checksum_list_url(base: &str, version: &str) -> String {
-    let base_url = env::var("BLUP_MIRROR_URL")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| base.to_string());
+    let base_url = get_base_url(base);
 
     let parts: Vec<&str> = version.split('.').collect();
     let major_minor = if parts.len() >= 2 {
@@ -69,6 +65,68 @@ pub fn build_checksum_list_url(base: &str, version: &str) -> String {
         "{}/Blender{}/blender-{}.sha256",
         base_url, major_minor, version
     )
+}
+
+pub fn find_latest_daily_installed() -> Result<String> {
+    let app_root = config::get_app_root()?;
+    let versions_dir = app_root.join("versions");
+
+    if !versions_dir.exists() {
+        bail!("No versions installed (versions directory not found).");
+    }
+
+    let entries = fs::read_dir(&versions_dir)
+        .with_context(|| format!("Failed to read directory: {:?}", versions_dir))?;
+
+    let mut candidates: Vec<(String, SystemTime)> = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') {
+            continue;
+        }
+
+        if is_daily_build_name(&name) {
+            let mtime = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+
+            candidates.push((name, mtime));
+        }
+    }
+
+    if candidates.is_empty() {
+        bail!("No daily builds found locally. Run `blup install daily --daily` first.");
+    }
+
+    candidates.sort_by(|(name_a, time_a), (name_b, time_b)| {
+        let version_order = daily::human_sort_version(name_b, name_a);
+
+        match version_order {
+            Ordering::Equal => time_b.cmp(time_a),
+            other => other,
+        }
+    });
+
+    Ok(candidates[0].0.clone())
+}
+
+fn is_daily_build_name(name: &str) -> bool {
+    let keywords = ["alpha", "beta", "candidate", "rc"];
+    keywords.iter().any(|&k| name.contains(k))
+}
+fn get_base_url(base: &str) -> String {
+    env::var("BLUP_MIRROR_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| base.to_string())
 }
 
 #[cfg(test)]
@@ -193,5 +251,18 @@ mod tests {
         assert!(extract_filename_from_url(url_slash).is_err());
 
         assert!(extract_filename_from_url("").is_err());
+    }
+
+    #[test]
+    fn test_is_daily_build_name() {
+        // ✅
+        assert!(is_daily_build_name("4.2.0-alpha-abcdef"));
+        assert!(is_daily_build_name("5.0.0-beta-123456"));
+        assert!(is_daily_build_name("3.6.0-candidate+main"));
+        assert!(is_daily_build_name("4.1.0-rc"));
+        // ❌
+        assert!(!is_daily_build_name("3.6.0"));
+        assert!(!is_daily_build_name("4.2.0"));
+        assert!(!is_daily_build_name("custom-build"));
     }
 }

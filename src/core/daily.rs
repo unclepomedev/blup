@@ -156,7 +156,7 @@ pub fn find_match(
     Ok(candidates[0].clone())
 }
 
-fn human_sort_version(v1: &str, v2: &str) -> std::cmp::Ordering {
+pub fn human_sort_version(v1: &str, v2: &str) -> std::cmp::Ordering {
     let v1_parts: Vec<&str> = v1.split('.').collect();
     let v2_parts: Vec<&str> = v2.split('.').collect();
 
