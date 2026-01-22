@@ -1,4 +1,4 @@
-use crate::core::{config, os};
+use crate::core::{config, os, version};
 use anyhow::{Context, Result, bail};
 use console::style;
 use std::fs;
@@ -7,22 +7,36 @@ use std::process::Command;
 
 pub fn run(version_arg: Option<String>, scripts: Option<String>, args: Vec<String>) -> Result<()> {
     let (version_arg, args) = prepare_run_args(version_arg, args);
-    let version = config::resolve_version(version_arg)?;
+    let mut version_str = config::resolve_version(version_arg)?;
+
+    if version_str == "daily" {
+        let actual_version = version::find_latest_daily_installed()?;
+        println!(
+            "{} Resolved 'daily' to installed version: {}",
+            style("i").blue(),
+            style(&actual_version).bold()
+        );
+        version_str = actual_version;
+    }
 
     let app_root = config::get_app_root()?;
-    let install_dir = app_root.join("versions").join(&version);
+    let install_dir = app_root.join("versions").join(&version_str);
 
     if !install_dir.exists() {
         bail!(
             "Blender {} is not installed. Run `blup install {}` first.",
-            version,
-            version
+            version_str,
+            version_str
         );
     }
 
     let bin_path = os::get_bin_path(&install_dir)?;
 
-    println!("{} Starting Blender {}...", style("==>").green(), version);
+    println!(
+        "{} Starting Blender {}...",
+        style("==>").green(),
+        version_str
+    );
 
     let mut command = Command::new(bin_path);
 
