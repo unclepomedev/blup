@@ -1,119 +1,141 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 use tempfile::TempDir;
+
+struct TestEnv {
+    root: TempDir,
+    bin_path: PathBuf,
+}
+
+impl TestEnv {
+    fn new() -> anyhow::Result<Self> {
+        let root = TempDir::new()?;
+        let bin_path = PathBuf::from(env!("CARGO_BIN_EXE_blup"));
+        Ok(Self { root, bin_path })
+    }
+
+    fn blup(&self) -> Command {
+        let mut cmd = Command::new(&self.bin_path);
+        cmd.env("BLUP_ROOT", self.root.path());
+        cmd
+    }
+
+    fn versions_dir(&self) -> PathBuf {
+        self.root.path().join("versions")
+    }
+}
 
 #[tokio::test]
 #[ignore]
-async fn test_real_server_install_and_remove() -> anyhow::Result<()> {
-    let temp_home = TempDir::new()?;
-    let home_path = temp_home.path().to_str().unwrap();
+async fn test_e2e_lifecycle() -> anyhow::Result<()> {
+    let env = TestEnv::new()?;
 
-    let target_version = "4.5.0";
+    let target_version = "5.0.1";
 
-    println!("Using temp home (BLUP_ROOT): {}", home_path);
+    println!("Using temp home: {:?}", env.root.path());
 
-    println!(
-        "==> Installing Blender {} from official server...",
-        target_version
-    );
-
-    let mut cmd_install = Command::new(env!("CARGO_BIN_EXE_blup"));
-    cmd_install
-        .env("BLUP_ROOT", home_path)
-        .arg("install")
-        .arg(target_version);
-
-    let output = cmd_install
-        .output()
-        .expect("Failed to execute install command");
-
-    println!("--- Install stdout ---");
-    println!("{}", String::from_utf8_lossy(&output.stdout));
-
-    if !output.status.success() {
-        println!("--- Install stdout ---");
-        println!("{}", String::from_utf8_lossy(&output.stdout));
-        println!("--- Install stderr ---");
-        println!("{}", String::from_utf8_lossy(&output.stderr));
-        panic!("Install command failed with status: {}", output.status);
-    }
-
-    println!("==> Verifying installation in list...");
-
-    let mut cmd_list = Command::new(env!("CARGO_BIN_EXE_blup"));
-    cmd_list.env("BLUP_ROOT", home_path).arg("list");
-
-    cmd_list
+    println!("Step 1: Checking remote list...");
+    env.blup()
+        .arg("list")
+        .arg("--remote")
         .assert()
         .success()
         .stdout(predicate::str::contains(target_version));
 
-    let bin_path = if cfg!(target_os = "macos") {
-        temp_home
-            .path()
-            .join("versions")
-            .join(target_version)
-            .join("Blender.app")
-            .join("Contents")
-            .join("MacOS")
-            .join("Blender")
+    println!("Step 2: Installing {}...", target_version);
+    env.blup()
+        .arg("install")
+        .arg(target_version)
+        .assert()
+        .success();
+
+    env.blup()
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(target_version));
+
+    println!("Step 3: Setting default version...");
+    env.blup()
+        .arg("default")
+        .arg(target_version)
+        .assert()
+        .success();
+
+    env.blup()
+        .arg("default")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(target_version));
+
+    println!("Step 4: Verifying binary path resolution...");
+
+    let expected_bin_suffix = if cfg!(target_os = "macos") {
+        PathBuf::from("Blender.app/Contents/MacOS/Blender")
+    } else if cfg!(windows) {
+        PathBuf::from("blender.exe")
     } else {
-        // Windows / Linux
-        let bin_name = if cfg!(windows) {
-            "blender.exe"
-        } else {
-            "blender"
-        };
-        temp_home
-            .path()
-            .join("versions")
-            .join(target_version)
-            .join(bin_name)
+        PathBuf::from("blender")
     };
 
-    if !bin_path.exists() {
-        println!("!!! Binary check failed. Dumping directory structure:");
-        let versions_dir = temp_home.path().join("versions");
-        if versions_dir.exists() {
-            for entry in walkdir::WalkDir::new(&versions_dir) {
-                match entry {
-                    Ok(e) => println!(" - {}", e.path().display()),
-                    Err(err) => println!("Error reading entry: {}", err),
-                }
-            }
-        } else {
-            println!("versions directory does not exist at {:?}", versions_dir);
-        }
-        panic!(
-            "Binary not found at expected path: {:?}. \nCheck extraction logic (strip components).",
-            bin_path
-        );
+    let full_expected_path = env
+        .versions_dir()
+        .join(target_version)
+        .join(&expected_bin_suffix);
+
+    if !full_expected_path.exists() {
+        panic!("Binary not found at: {:?}", full_expected_path);
     }
 
-    println!("==> Uninstalling...");
+    env.blup()
+        .arg("which")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            full_expected_path.to_str().unwrap(),
+        ));
 
-    let mut cmd_uninstall = Command::new(env!("CARGO_BIN_EXE_blup"));
-    cmd_uninstall
-        .env("BLUP_ROOT", home_path)
+    println!("Step 5: Testing .blender-version priority...");
+
+    let version_file = env.root.path().join(".blender-version");
+    let dummy_version = "99.9.9";
+    tokio::fs::write(&version_file, dummy_version).await?;
+
+    env.blup()
+        .current_dir(env.root.path())
+        .arg("resolve")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(dummy_version))
+        .stdout(predicate::str::contains("5.0.1").not());
+
+    tokio::fs::remove_file(&version_file).await?;
+
+    println!("Step 6: Dry-run execution...");
+
+    env.blup()
+        .arg("run")
+        .arg("--")
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Blender"));
+
+    println!("Step 7: Uninstalling...");
+    env.blup()
         .arg("remove")
         .arg(target_version)
-        .arg("-y");
+        .arg("-y")
+        .assert()
+        .success();
 
-    let output_uninstall = cmd_uninstall
-        .output()
-        .expect("Failed to execute remove command");
-    if !output_uninstall.status.success() {
-        println!("--- Remove stdout ---");
-        println!("{}", String::from_utf8_lossy(&output_uninstall.stdout));
-        println!("--- Remove stderr ---");
-        println!("{}", String::from_utf8_lossy(&output_uninstall.stderr));
-        panic!("Remove command failed");
+    if full_expected_path.exists() {
+        panic!("Binary still exists after removal!");
     }
 
-    let mut cmd_list_after = Command::new(env!("CARGO_BIN_EXE_blup"));
-    cmd_list_after.env("BLUP_ROOT", home_path).arg("list");
-
-    cmd_list_after
+    env.blup()
+        .arg("list")
         .assert()
         .success()
         .stdout(predicate::str::contains(target_version).not());
