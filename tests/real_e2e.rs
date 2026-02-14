@@ -99,15 +99,18 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
     println!("Step 5: Testing .blender-version priority...");
 
     let version_file = env.root.path().join(".blender-version");
-    tokio::fs::write(&version_file, target_version).await?;
+    let dummy_version = "99.9.9";
+    tokio::fs::write(&version_file, dummy_version).await?;
 
-    let mut resolve_cmd = env.blup();
-    resolve_cmd
+    env.blup()
         .current_dir(env.root.path())
         .arg("resolve")
         .assert()
         .success()
-        .stdout(predicate::str::contains(target_version));
+        .stdout(predicate::str::contains(dummy_version))
+        .stdout(predicate::str::contains("5.0.1").not());
+
+    tokio::fs::remove_file(&version_file).await?;
 
     println!("Step 6: Dry-run execution...");
 
@@ -116,6 +119,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("--")
         .arg("--version")
         .assert()
+        .success()
         .stdout(predicate::str::contains("Blender"));
 
     println!("Step 7: Uninstalling...");
