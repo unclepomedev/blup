@@ -134,7 +134,8 @@ pub fn find_match(
             }
 
             let version_match = b.version.starts_with(version_query)
-                || (version_query == "daily" && b.branch == "main");
+                || (version_query == "daily" && b.branch == "main")
+                || version_query == format!("{}-{}", b.version, b.risk_id);
 
             if !version_match {
                 return false;
@@ -252,5 +253,53 @@ mod tests {
 
         assert_eq!(builds[0].file_extension, "tar.xz");
         assert_eq!(builds[1].file_extension, "zip");
+    }
+
+    #[test]
+    fn test_find_match_alias() {
+        let builds = vec![DailyBuild {
+            url: "url".to_string(),
+            version: "4.5.7".to_string(),
+            risk_id: "candidate".to_string(),
+            branch: "v45".to_string(),
+            hash: "f399cca".to_string(),
+            platform: "darwin".to_string(),
+            architecture: "arm64".to_string(),
+            file_name: "blender-4.5.7-candidate.dmg".to_string(),
+            file_mtime: 123456,
+            file_extension: "dmg".to_string(),
+            checksum: None,
+        }];
+
+        let platform = Platform {
+            os: "macos".to_string(),
+            arch: "arm64".to_string(),
+            ext: "dmg".to_string(),
+        };
+
+        let result = find_match(&builds, "4.5.7-candidate", &platform);
+        assert!(result.is_ok(), "Should match with alias");
+
+        let builds_beta = vec![DailyBuild {
+            url: "url".to_string(),
+            version: "5.1.0".to_string(),
+            risk_id: "beta".to_string(),
+            branch: "v51".to_string(),
+            hash: "94742bf".to_string(),
+            platform: "darwin".to_string(),
+            architecture: "arm64".to_string(),
+            file_name: "blender-5.1.0-beta.dmg".to_string(),
+            file_mtime: 123456,
+            file_extension: "dmg".to_string(),
+            checksum: None,
+        }];
+        let result = find_match(&builds_beta, "5.1.0-beta", &platform);
+        assert!(result.is_ok(), "Should match with beta alias");
+
+        let result = find_match(&builds, "4.5.7", &platform);
+        assert!(result.is_ok(), "Should match with version only");
+
+        let result = find_match(&builds, "4.5.7-alpha", &platform);
+        assert!(result.is_err());
     }
 }
