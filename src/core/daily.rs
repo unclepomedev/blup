@@ -214,8 +214,10 @@ mod tests {
         assert!(is_lts("3.3.21"));
         assert!(is_lts("3.6.0"));
         assert!(is_lts("4.2.10"));
+        assert!(is_lts("5.2.0"));
         assert!(!is_lts("2.83.0"));
         assert!(!is_lts("5.0.0"));
+        assert!(!is_lts("5.1.0"));
     }
 
     #[test]
