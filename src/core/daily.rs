@@ -27,7 +27,7 @@ pub struct RemoteSection {
     pub daily: Vec<DailyBuild>,
 }
 
-const LTS_VERSIONS: &[&str] = &["3.3", "3.6", "4.2", "4.5"]; // ignore 2.93, 2.83
+const LTS_VERSIONS: &[&str] = &["3.3", "3.6", "4.2", "4.5", "5.2"]; // ignore 2.93, 2.83
 
 pub fn is_lts(version: &str) -> bool {
     LTS_VERSIONS
