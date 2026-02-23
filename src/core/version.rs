@@ -19,6 +19,8 @@ pub fn extract_filename_from_url(url: &str) -> Result<String> {
 }
 
 /// Validates that a version string is safe and doesn't contain path traversal characters.
+/// Note: This intentionally does not enforce a strict format (like containing dots)
+/// to allow users to reference local custom build directories (e.g. "custom-build-v1").
 pub fn validate_version_string(v: &str) -> Result<()> {
     let path = Path::new(v);
     let mut components = path.components();
@@ -125,6 +127,10 @@ fn get_base_url(base: &str) -> String {
 }
 
 fn major_minor(version: &str) -> String {
+    // Fallback to the raw string is acceptable here. For valid official releases (e.g. "4.2.1"),
+    // this extracts the "4.2" prefix used in Blender's URL structure.
+    // For non-standard versions (e.g. "custom-build"), this will generate a malformed URL
+    // which safely results in a 404 error during the HTTP request.
     let parts: Vec<&str> = version.split('.').collect();
     if parts.len() >= 2 {
         format!("{}.{}", parts[0], parts[1])
