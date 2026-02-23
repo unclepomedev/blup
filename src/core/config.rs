@@ -128,6 +128,13 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+    struct CwdGuard(PathBuf);
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.0);
+        }
+    }
+
     struct ScopedEnv {
         key: String,
         original: Option<String>,
@@ -203,12 +210,6 @@ mod tests {
         let original_cwd = env::current_dir()?;
         env::set_current_dir(&project_dir)?;
 
-        struct CwdGuard(PathBuf);
-        impl Drop for CwdGuard {
-            fn drop(&mut self) {
-                let _ = env::set_current_dir(&self.0);
-            }
-        }
         let _cwd_guard = CwdGuard(original_cwd);
 
         save(&Settings {
@@ -259,12 +260,6 @@ mod tests {
         let original_cwd = env::current_dir()?;
         env::set_current_dir(&project_dir)?;
 
-        struct CwdGuard(PathBuf);
-        impl Drop for CwdGuard {
-            fn drop(&mut self) {
-                let _ = env::set_current_dir(&self.0);
-            }
-        }
         let _cwd_guard = CwdGuard(original_cwd);
 
         save(&Settings {
