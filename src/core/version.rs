@@ -9,6 +9,7 @@ use std::time::SystemTime;
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
 
+/// Extracts the filename from a download URL.
 pub fn extract_filename_from_url(url: &str) -> Result<String> {
     url.split('/')
         .next_back()
@@ -17,6 +18,7 @@ pub fn extract_filename_from_url(url: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not determine archive filename from URL: {}", url))
 }
 
+/// Validates that a version string is safe and doesn't contain path traversal characters.
 pub fn validate_version_string(v: &str) -> Result<()> {
     let path = Path::new(v);
     let mut components = path.components();
@@ -33,6 +35,7 @@ pub fn validate_version_string(v: &str) -> Result<()> {
     Ok(())
 }
 
+/// Constructs the download URL for a specific version and platform of Blender.
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     let base_url = get_base_url(base);
 
@@ -51,6 +54,7 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     )
 }
 
+/// Constructs the URL for the SHA256 checksum file of a specific version.
 pub fn build_checksum_list_url(base: &str, version: &str) -> String {
     let base_url = get_base_url(base);
 
@@ -67,6 +71,7 @@ pub fn build_checksum_list_url(base: &str, version: &str) -> String {
     )
 }
 
+/// Finds the latest installed daily build on the local system.
 pub fn find_latest_daily_installed() -> Result<String> {
     let app_root = config::get_app_root()?;
     let versions_dir = app_root.join("versions");

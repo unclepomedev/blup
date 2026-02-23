@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use std::env;
 use std::path::{Path, PathBuf};
 
+/// Represents the target platform (OS, architecture, and file extension).
 #[derive(Debug, PartialEq)]
 pub struct Platform {
     pub os: String,
@@ -9,6 +10,7 @@ pub struct Platform {
     pub ext: String, // .zip, .tar.xz, .dmg
 }
 
+/// Detects the current platform's OS and architecture.
 pub fn detect_platform() -> Result<Platform> {
     let os = env::consts::OS;
     let arch = env::consts::ARCH;
@@ -33,6 +35,7 @@ pub fn detect_platform() -> Result<Platform> {
     })
 }
 
+/// Returns the expected path to the Blender executable within an installation directory.
 pub fn get_bin_path(install_dir: &Path) -> Result<PathBuf> {
     let os = env::consts::OS;
 

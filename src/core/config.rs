@@ -6,11 +6,14 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// Configuration settings for the application.
 #[derive(Serialize, Deserialize, Default)]
 pub struct Settings {
     pub default_version: Option<String>,
 }
 
+/// Returns the root directory where the application stores its data.
+/// The path can be overridden by the `BLUP_ROOT` environment variable.
 pub fn get_app_root() -> Result<PathBuf> {
     if let Ok(root) = std::env::var("BLUP_ROOT") {
         return Ok(PathBuf::from(root));
@@ -20,6 +23,8 @@ pub fn get_app_root() -> Result<PathBuf> {
     Ok(base_dirs.data_local_dir().join("blup"))
 }
 
+/// Returns the directory where the application's configuration files are stored.
+/// Creates the directory if it doesn't exist.
 pub fn get_config_dir() -> Result<PathBuf> {
     let root = get_app_root()?;
     let config_dir = root.join("config");
@@ -30,6 +35,8 @@ pub fn get_config_dir() -> Result<PathBuf> {
     Ok(config_dir)
 }
 
+/// Loads the application settings from the configuration file.
+/// Returns default settings if the file doesn't exist.
 pub fn load() -> Result<Settings> {
     let config_path = get_config_dir()?.join("settings.toml");
     if !config_path.exists() {
@@ -42,6 +49,7 @@ pub fn load() -> Result<Settings> {
     Ok(settings)
 }
 
+/// Saves the application settings to the configuration file.
 pub fn save(settings: &Settings) -> Result<()> {
     let config_path = get_config_dir()?.join("settings.toml");
     let content = toml::to_string_pretty(settings)?;
@@ -49,6 +57,7 @@ pub fn save(settings: &Settings) -> Result<()> {
     Ok(())
 }
 
+/// Resolves a version string from either the provided argument or a local `.blender-version` file.
 pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<String>> {
     if let Some(v) = arg_version {
         if let Err(e) = version::validate_version_string(&v) {
@@ -85,6 +94,8 @@ pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<S
     Ok(None)
 }
 
+/// Resolves the version to use, prioritizing the provided argument, then the local `.blender-version` file,
+/// and finally the default version in the application settings.
 pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
     if let Some(v) = resolve_from_args_or_file(arg_version)? {
         return Ok(v);

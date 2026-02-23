@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 const DAILY_JSON_URL: &str = "https://builder.blender.org/download/daily/?format=json&v=2";
 
+/// Represents a single build available from the Blender builder API.
 #[derive(Debug, Deserialize, Clone)]
 pub struct DailyBuild {
     pub url: String,
@@ -21,6 +22,7 @@ pub struct DailyBuild {
     pub checksum: Option<String>,
 }
 
+/// A container for stable and daily builds fetched from the remote API.
 #[derive(Debug, Deserialize, Clone)]
 pub struct RemoteSection {
     pub stable: Vec<DailyBuild>,
@@ -29,12 +31,14 @@ pub struct RemoteSection {
 
 const LTS_VERSIONS: &[&str] = &["3.3", "3.6", "4.2", "4.5", "5.2"]; // ignore 2.93, 2.83
 
+/// Returns true if the given version string represents an LTS (Long Term Support) release.
 pub fn is_lts(version: &str) -> bool {
     LTS_VERSIONS
         .iter()
         .any(|&lts| version == lts || version.starts_with(&format!("{}.", lts)))
 }
 
+/// Categorizes a list of builds into stable and daily sections for a specific platform.
 pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
     let target_platform = match platform.os.as_str() {
         "macos" => "darwin",
@@ -86,6 +90,7 @@ fn normalize_daily_builds(builds: &mut [DailyBuild]) {
     }
 }
 
+/// Fetches the current list of daily/experimental builds from the official Blender builder API.
 pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
     let response = client
         .get(DAILY_JSON_URL)
@@ -104,6 +109,7 @@ pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
     Ok(builds)
 }
 
+/// Searches for a build that matches the specified version query and platform.
 pub fn find_match(
     builds: &[DailyBuild],
     version_query: &str,

@@ -10,6 +10,8 @@ use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
+/// Downloads a file from the given URL and saves it to the destination path.
+/// Shows a progress bar unless running in CI or a non-terminal environment.
 pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Result<()> {
     let res = client
         .get(url)
@@ -42,6 +44,7 @@ pub async fn download_file(client: &Client, url: &str, dest_path: &Path) -> Resu
     Ok(())
 }
 
+/// Verifies the SHA256 checksum of a file against an expected value.
 pub async fn verify_checksum(file_path: &Path, expected_checksum: &str) -> Result<()> {
     let file_path = file_path.to_path_buf();
     let expected_checksum = expected_checksum.to_string();
@@ -77,6 +80,8 @@ fn verify_checksum_sync(file_path: &Path, expected_checksum: &str) -> Result<()>
     }
 }
 
+/// Searches for a filename in a checksum list content and returns its associated hash.
+/// The list format is expected to be "hash filename" per line.
 pub fn find_checksum_in_list(list_content: &str, target_filename: &str) -> Option<String> {
     for line in list_content.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
