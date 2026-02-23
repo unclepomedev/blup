@@ -103,6 +103,9 @@ pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
 
     let settings = load()?;
     if let Some(v) = settings.default_version {
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!("Default version '{}' in settings is invalid. Reason: {}", v, e);
+        }
         return Ok(v);
     }
 
@@ -236,6 +239,40 @@ mod tests {
 
         let result = resolve_version(None);
         assert!(result.is_err(), "Should be an error if nothing specified");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_invalid_default() -> Result<()> {
+        let _lock = ENV_LOCK.lock();
+
+        let temp_root = tempdir()?;
+        let project_dir = tempdir()?;
+
+        let _env_guard = ScopedEnv::new("BLUP_ROOT", temp_root.path().to_str().unwrap());
+
+        let original_cwd = env::current_dir()?;
+        env::set_current_dir(&project_dir)?;
+
+        struct CwdGuard(PathBuf);
+        impl Drop for CwdGuard {
+            fn drop(&mut self) {
+                let _ = env::set_current_dir(&self.0);
+            }
+        }
+        let _cwd_guard = CwdGuard(original_cwd);
+
+        save(&Settings {
+            default_version: Some("../invalid_version".into()),
+        })?;
+
+        let result = resolve_version(None);
+        assert!(result.is_err(), "Should be an error if default version is invalid");
+        
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Default version"));
+        assert!(err_msg.contains("is invalid"));
 
         Ok(())
     }
