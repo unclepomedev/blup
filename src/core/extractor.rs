@@ -2,6 +2,8 @@ use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+/// Extracts the specified archive to the destination directory.
+/// Supports .zip, .tar.xz, and .dmg (macOS only) formats.
 pub fn extract(archive_path: &Path, dest_dir: &Path) -> Result<()> {
     let path_str = archive_path.to_string_lossy();
 

@@ -9,6 +9,7 @@ use std::time::SystemTime;
 
 pub const OFFICIAL_URL: &str = "https://download.blender.org/release";
 
+/// Extracts the filename from a download URL.
 pub fn extract_filename_from_url(url: &str) -> Result<String> {
     url.split('/')
         .next_back()
@@ -17,6 +18,9 @@ pub fn extract_filename_from_url(url: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not determine archive filename from URL: {}", url))
 }
 
+/// Validates that a version string is safe and doesn't contain path traversal characters.
+/// Note: This intentionally does not enforce a strict format (like containing dots)
+/// to allow users to reference local custom build directories (e.g. "custom-build-v1").
 pub fn validate_version_string(v: &str) -> Result<()> {
     let path = Path::new(v);
     let mut components = path.components();
@@ -33,16 +37,12 @@ pub fn validate_version_string(v: &str) -> Result<()> {
     Ok(())
 }
 
+/// Constructs the download URL for a specific version and platform of Blender.
 pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     let base_url = get_base_url(base);
 
     // version: "5.0.0" -> major_minor: "5.0"
-    let parts: Vec<&str> = version.split('.').collect();
-    let major_minor = if parts.len() >= 2 {
-        format!("{}.{}", parts[0], parts[1])
-    } else {
-        version.to_string()
-    };
+    let major_minor = major_minor(version);
 
     // e.g. https://download.blender.org/release/Blender5.0/blender-5.0.0-windows-x64.zip
     format!(
@@ -51,15 +51,11 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     )
 }
 
+/// Constructs the URL for the SHA256 checksum file of a specific version.
 pub fn build_checksum_list_url(base: &str, version: &str) -> String {
     let base_url = get_base_url(base);
 
-    let parts: Vec<&str> = version.split('.').collect();
-    let major_minor = if parts.len() >= 2 {
-        format!("{}.{}", parts[0], parts[1])
-    } else {
-        version.to_string()
-    };
+    let major_minor = major_minor(version);
 
     format!(
         "{}/Blender{}/blender-{}.sha256",
@@ -67,6 +63,7 @@ pub fn build_checksum_list_url(base: &str, version: &str) -> String {
     )
 }
 
+/// Finds the latest installed daily build on the local system.
 pub fn find_latest_daily_installed() -> Result<String> {
     let app_root = config::get_app_root()?;
     let versions_dir = app_root.join("versions");
@@ -127,6 +124,19 @@ fn get_base_url(base: &str) -> String {
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| base.to_string())
+}
+
+fn major_minor(version: &str) -> String {
+    // Fallback to the raw string is acceptable here. For valid official releases (e.g. "4.2.1"),
+    // this extracts the "4.2" prefix used in Blender's URL structure.
+    // For non-standard versions (e.g. "custom-build"), this will generate a malformed URL
+    // which safely results in a 404 error during the HTTP request.
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() >= 2 {
+        format!("{}.{}", parts[0], parts[1])
+    } else {
+        version.to_string()
+    }
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 const DAILY_JSON_URL: &str = "https://builder.blender.org/download/daily/?format=json&v=2";
 
+/// Represents a single build available from the Blender builder API.
 #[derive(Debug, Deserialize, Clone)]
 pub struct DailyBuild {
     pub url: String,
@@ -21,6 +22,7 @@ pub struct DailyBuild {
     pub checksum: Option<String>,
 }
 
+/// A container for stable and daily builds fetched from the remote API.
 #[derive(Debug, Deserialize, Clone)]
 pub struct RemoteSection {
     pub stable: Vec<DailyBuild>,
@@ -29,29 +31,41 @@ pub struct RemoteSection {
 
 const LTS_VERSIONS: &[&str] = &["3.3", "3.6", "4.2", "4.5", "5.2"]; // ignore 2.93, 2.83
 
+/// Returns true if the given version string represents an LTS (Long Term Support) release.
 pub fn is_lts(version: &str) -> bool {
     LTS_VERSIONS
         .iter()
         .any(|&lts| version == lts || version.starts_with(&format!("{}.", lts)))
 }
 
-pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
-    let target_platform = match platform.os.as_str() {
+fn api_platform(platform: &Platform) -> &str {
+    match platform.os.as_str() {
         "macos" => "darwin",
         other => other,
-    };
+    }
+}
 
-    let target_arch = match (platform.os.as_str(), platform.arch.as_str()) {
+fn api_arch(platform: &Platform) -> &str {
+    match (platform.os.as_str(), platform.arch.as_str()) {
         ("windows", "x64") => "amd64",
         (_, "x64") => "x86_64",
         (_, arch) => arch,
-    };
+    }
+}
 
-    let preferred_ext = if platform.os == "windows" {
+fn preferred_ext(platform: &Platform) -> &str {
+    if platform.os == "windows" {
         "zip"
     } else {
         &platform.ext
-    };
+    }
+}
+
+/// Categorizes a list of builds into stable and daily sections for a specific platform.
+pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
+    let target_platform = api_platform(platform);
+    let target_arch = api_arch(platform);
+    let preferred_ext = preferred_ext(platform);
 
     let mut stable = Vec::new();
     let mut daily = Vec::new();
@@ -86,6 +100,7 @@ fn normalize_daily_builds(builds: &mut [DailyBuild]) {
     }
 }
 
+/// Fetches the current list of daily/experimental builds from the official Blender builder API.
 pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
     let response = client
         .get(DAILY_JSON_URL)
@@ -104,27 +119,15 @@ pub async fn fetch_daily_list(client: &Client) -> Result<Vec<DailyBuild>> {
     Ok(builds)
 }
 
+/// Searches for a build that matches the specified version query and platform.
 pub fn find_match(
     builds: &[DailyBuild],
     version_query: &str,
     platform: &Platform,
 ) -> Result<DailyBuild> {
-    let target_platform = match platform.os.as_str() {
-        "macos" => "darwin",
-        other => other,
-    };
-
-    let target_arch = match (platform.os.as_str(), platform.arch.as_str()) {
-        ("windows", "x64") => "amd64",
-        (_, "x64") => "x86_64",
-        (_, arch) => arch, // "arm64" matches
-    };
-
-    let preferred_ext = if platform.os == "windows" {
-        "zip"
-    } else {
-        &platform.ext
-    };
+    let target_platform = api_platform(platform);
+    let target_arch = api_arch(platform);
+    let preferred_ext = preferred_ext(platform);
 
     let mut candidates: Vec<&DailyBuild> = builds
         .iter()

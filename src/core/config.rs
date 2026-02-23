@@ -6,11 +6,14 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// Configuration settings for the application.
 #[derive(Serialize, Deserialize, Default)]
 pub struct Settings {
     pub default_version: Option<String>,
 }
 
+/// Returns the root directory where the application stores its data.
+/// The path can be overridden by the `BLUP_ROOT` environment variable.
 pub fn get_app_root() -> Result<PathBuf> {
     if let Ok(root) = std::env::var("BLUP_ROOT") {
         return Ok(PathBuf::from(root));
@@ -20,6 +23,8 @@ pub fn get_app_root() -> Result<PathBuf> {
     Ok(base_dirs.data_local_dir().join("blup"))
 }
 
+/// Returns the directory where the application's configuration files are stored.
+/// Creates the directory if it doesn't exist.
 pub fn get_config_dir() -> Result<PathBuf> {
     let root = get_app_root()?;
     let config_dir = root.join("config");
@@ -30,6 +35,8 @@ pub fn get_config_dir() -> Result<PathBuf> {
     Ok(config_dir)
 }
 
+/// Loads the application settings from the configuration file.
+/// Returns default settings if the file doesn't exist.
 pub fn load() -> Result<Settings> {
     let config_path = get_config_dir()?.join("settings.toml");
     if !config_path.exists() {
@@ -42,6 +49,7 @@ pub fn load() -> Result<Settings> {
     Ok(settings)
 }
 
+/// Saves the application settings to the configuration file.
 pub fn save(settings: &Settings) -> Result<()> {
     let config_path = get_config_dir()?.join("settings.toml");
     let content = toml::to_string_pretty(settings)?;
@@ -49,6 +57,7 @@ pub fn save(settings: &Settings) -> Result<()> {
     Ok(())
 }
 
+/// Resolves a version string from either the provided argument or a local `.blender-version` file.
 pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<String>> {
     if let Some(v) = arg_version {
         if let Err(e) = version::validate_version_string(&v) {
@@ -85,6 +94,8 @@ pub fn resolve_from_args_or_file(arg_version: Option<String>) -> Result<Option<S
     Ok(None)
 }
 
+/// Resolves the version to use, prioritizing the provided argument, then the local `.blender-version` file,
+/// and finally the default version in the application settings.
 pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
     if let Some(v) = resolve_from_args_or_file(arg_version)? {
         return Ok(v);
@@ -92,6 +103,13 @@ pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
 
     let settings = load()?;
     if let Some(v) = settings.default_version {
+        if let Err(e) = version::validate_version_string(&v) {
+            bail!(
+                "Default version '{}' in settings is invalid. Reason: {}",
+                v,
+                e
+            );
+        }
         return Ok(v);
     }
 
@@ -109,6 +127,13 @@ mod tests {
     use tempfile::tempdir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct CwdGuard(PathBuf);
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.0);
+        }
+    }
 
     struct ScopedEnv {
         key: String,
@@ -185,12 +210,6 @@ mod tests {
         let original_cwd = env::current_dir()?;
         env::set_current_dir(&project_dir)?;
 
-        struct CwdGuard(PathBuf);
-        impl Drop for CwdGuard {
-            fn drop(&mut self) {
-                let _ = env::set_current_dir(&self.0);
-            }
-        }
         let _cwd_guard = CwdGuard(original_cwd);
 
         save(&Settings {
@@ -225,6 +244,37 @@ mod tests {
 
         let result = resolve_version(None);
         assert!(result.is_err(), "Should be an error if nothing specified");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_invalid_default() -> Result<()> {
+        let _lock = ENV_LOCK.lock();
+
+        let temp_root = tempdir()?;
+        let project_dir = tempdir()?;
+
+        let _env_guard = ScopedEnv::new("BLUP_ROOT", temp_root.path().to_str().unwrap());
+
+        let original_cwd = env::current_dir()?;
+        env::set_current_dir(&project_dir)?;
+
+        let _cwd_guard = CwdGuard(original_cwd);
+
+        save(&Settings {
+            default_version: Some("../invalid_version".into()),
+        })?;
+
+        let result = resolve_version(None);
+        assert!(
+            result.is_err(),
+            "Should be an error if default version is invalid"
+        );
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Default version"));
+        assert!(err_msg.contains("is invalid"));
 
         Ok(())
     }
