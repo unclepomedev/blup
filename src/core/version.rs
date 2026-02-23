@@ -40,12 +40,7 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
     let base_url = get_base_url(base);
 
     // version: "5.0.0" -> major_minor: "5.0"
-    let parts: Vec<&str> = version.split('.').collect();
-    let major_minor = if parts.len() >= 2 {
-        format!("{}.{}", parts[0], parts[1])
-    } else {
-        version.to_string()
-    };
+    let major_minor = major_minor(version);
 
     // e.g. https://download.blender.org/release/Blender5.0/blender-5.0.0-windows-x64.zip
     format!(
@@ -58,12 +53,7 @@ pub fn build_url(base: &str, version: &str, platform: &Platform) -> String {
 pub fn build_checksum_list_url(base: &str, version: &str) -> String {
     let base_url = get_base_url(base);
 
-    let parts: Vec<&str> = version.split('.').collect();
-    let major_minor = if parts.len() >= 2 {
-        format!("{}.{}", parts[0], parts[1])
-    } else {
-        version.to_string()
-    };
+    let major_minor = major_minor(version);
 
     format!(
         "{}/Blender{}/blender-{}.sha256",
@@ -132,6 +122,15 @@ fn get_base_url(base: &str) -> String {
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| base.to_string())
+}
+
+fn major_minor(version: &str) -> String {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() >= 2 {
+        format!("{}.{}", parts[0], parts[1])
+    } else {
+        version.to_string()
+    }
 }
 
 #[cfg(test)]

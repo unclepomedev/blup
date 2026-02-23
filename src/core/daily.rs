@@ -38,24 +38,34 @@ pub fn is_lts(version: &str) -> bool {
         .any(|&lts| version == lts || version.starts_with(&format!("{}.", lts)))
 }
 
-/// Categorizes a list of builds into stable and daily sections for a specific platform.
-pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
-    let target_platform = match platform.os.as_str() {
+fn api_platform(platform: &Platform) -> &str {
+    match platform.os.as_str() {
         "macos" => "darwin",
         other => other,
-    };
+    }
+}
 
-    let target_arch = match (platform.os.as_str(), platform.arch.as_str()) {
+fn api_arch(platform: &Platform) -> &str {
+    match (platform.os.as_str(), platform.arch.as_str()) {
         ("windows", "x64") => "amd64",
         (_, "x64") => "x86_64",
         (_, arch) => arch,
-    };
+    }
+}
 
-    let preferred_ext = if platform.os == "windows" {
+fn preferred_ext(platform: &Platform) -> &str {
+    if platform.os == "windows" {
         "zip"
     } else {
         &platform.ext
-    };
+    }
+}
+
+/// Categorizes a list of builds into stable and daily sections for a specific platform.
+pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> RemoteSection {
+    let target_platform = api_platform(platform);
+    let target_arch = api_arch(platform);
+    let preferred_ext = preferred_ext(platform);
 
     let mut stable = Vec::new();
     let mut daily = Vec::new();
@@ -115,22 +125,9 @@ pub fn find_match(
     version_query: &str,
     platform: &Platform,
 ) -> Result<DailyBuild> {
-    let target_platform = match platform.os.as_str() {
-        "macos" => "darwin",
-        other => other,
-    };
-
-    let target_arch = match (platform.os.as_str(), platform.arch.as_str()) {
-        ("windows", "x64") => "amd64",
-        (_, "x64") => "x86_64",
-        (_, arch) => arch, // "arm64" matches
-    };
-
-    let preferred_ext = if platform.os == "windows" {
-        "zip"
-    } else {
-        &platform.ext
-    };
+    let target_platform = api_platform(platform);
+    let target_arch = api_arch(platform);
+    let preferred_ext = preferred_ext(platform);
 
     let mut candidates: Vec<&DailyBuild> = builds
         .iter()
