@@ -104,7 +104,11 @@ pub fn resolve_version(arg_version: Option<String>) -> Result<String> {
     let settings = load()?;
     if let Some(v) = settings.default_version {
         if let Err(e) = version::validate_version_string(&v) {
-            bail!("Default version '{}' in settings is invalid. Reason: {}", v, e);
+            bail!(
+                "Default version '{}' in settings is invalid. Reason: {}",
+                v,
+                e
+            );
         }
         return Ok(v);
     }
@@ -268,8 +272,11 @@ mod tests {
         })?;
 
         let result = resolve_version(None);
-        assert!(result.is_err(), "Should be an error if default version is invalid");
-        
+        assert!(
+            result.is_err(),
+            "Should be an error if default version is invalid"
+        );
+
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("Default version"));
         assert!(err_msg.contains("is invalid"));
