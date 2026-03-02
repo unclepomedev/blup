@@ -147,6 +147,7 @@ mod tests {
 
     #[test]
     fn test_url_generation_windows() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let platform = Platform {
             os: "windows".to_string(),
             arch: "x64".to_string(),
@@ -161,6 +162,7 @@ mod tests {
 
     #[test]
     fn test_url_generation_linux() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let platform = Platform {
             os: "linux".to_string(),
             arch: "x64".to_string(),
@@ -175,6 +177,7 @@ mod tests {
 
     #[test]
     fn test_url_generation_macos() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let platform = Platform {
             os: "macos".to_string(),
             arch: "arm64".to_string(),
