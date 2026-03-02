@@ -237,6 +237,7 @@ mod tests {
 
     #[test]
     fn test_build_checksum_list_url() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let url = build_checksum_list_url(OFFICIAL_URL, "5.0.1");
         assert_eq!(
             url,
