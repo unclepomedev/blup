@@ -2,6 +2,7 @@ use crate::core::os::Platform;
 use anyhow::{Context, Result, bail};
 use reqwest::Client;
 use serde::Deserialize;
+use std::cmp::{Ordering, Reverse, max};
 
 const DAILY_JSON_URL: &str = "https://builder.blender.org/download/daily/?format=json&v=2";
 
@@ -86,7 +87,7 @@ pub fn categorize_builds(builds: Vec<DailyBuild>, platform: &Platform) -> Remote
     }
 
     stable.sort_by(|a, b| human_sort_version(&b.version, &a.version));
-    daily.sort_by(|a, b| b.file_mtime.cmp(&a.file_mtime));
+    daily.sort_by_key(|b| Reverse(b.file_mtime));
 
     RemoteSection { stable, daily }
 }
@@ -156,15 +157,15 @@ pub fn find_match(
         );
     }
 
-    candidates.sort_by(|a, b| b.file_mtime.cmp(&a.file_mtime));
+    candidates.sort_by_key(|b| Reverse(b.file_mtime));
     Ok(candidates[0].clone())
 }
 
-pub fn human_sort_version(v1: &str, v2: &str) -> std::cmp::Ordering {
+pub fn human_sort_version(v1: &str, v2: &str) -> Ordering {
     let v1_parts: Vec<&str> = v1.split('.').collect();
     let v2_parts: Vec<&str> = v2.split('.').collect();
 
-    let len = std::cmp::max(v1_parts.len(), v2_parts.len());
+    let len = max(v1_parts.len(), v2_parts.len());
 
     for i in 0..len {
         let p1 = v1_parts.get(i).unwrap_or(&"0");
@@ -175,16 +176,16 @@ pub fn human_sort_version(v1: &str, v2: &str) -> std::cmp::Ordering {
 
         match (n1, n2) {
             (Ok(num1), Ok(num2)) => match num1.cmp(&num2) {
-                std::cmp::Ordering::Equal => continue,
+                Ordering::Equal => continue,
                 ord => return ord,
             },
             _ => match p1.cmp(p2) {
-                std::cmp::Ordering::Equal => continue,
+                Ordering::Equal => continue,
                 ord => return ord,
             },
         }
     }
-    std::cmp::Ordering::Equal
+    Ordering::Equal
 }
 
 #[cfg(test)]
