@@ -29,7 +29,7 @@ async fn test_download_and_extract_flow() {
 
     let temp_dir = tempfile::tempdir().unwrap();
     let client = Client::new();
-    let url = format!("{}/fake_blender.zip", &mock_server.uri());
+    let url = format!("{}/fake_blender.zip", mock_server.uri());
     let archive_path = temp_dir.path().join("downloaded.zip");
 
     downloader::download_file(&client, &url, &archive_path)
