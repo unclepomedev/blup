@@ -41,5 +41,8 @@
   ],
   "schedule": [
     "before 9am on monday"
+  ],
+  "assignees": [
+    "unclepomedev"
   ]
 }
