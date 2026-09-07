@@ -5,22 +5,49 @@ use std::error::Error;
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-#[test]
-fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> {
-    let temp = tempfile::tempdir()?;
-    let root = temp.path();
+fn create_mock_executable(dir: &Path, content: &str) -> Result<PathBuf, Box<dyn Error>> {
+    #[cfg(windows)]
+    let mock_bin = dir.join("mock_blender.bat");
+    #[cfg(not(windows))]
+    let mock_bin = dir.join("mock_blender");
 
-    // Create a mock executable
-    let mock_bin = root.join("mock_blender");
-    fs::write(&mock_bin, "#!/bin/sh\necho 'Blender 4.2.0'\n")?;
+    #[cfg(windows)]
+    {
+        let win_content = if content.is_empty() {
+            "@echo off\r\n".to_string()
+        } else {
+            format!("@echo off\r\n{}\r\n", content.replace("#!/bin/sh\n", "").replace('\'', ""))
+        };
+        fs::write(&mock_bin, win_content)?;
+    }
+    #[cfg(not(windows))]
+    {
+        let sh_content = if content.is_empty() {
+            "#!/bin/sh\n".to_string()
+        } else {
+            content.to_string()
+        };
+        fs::write(&mock_bin, sh_content)?;
+    }
+
     #[cfg(unix)]
     {
         let mut perms = fs::metadata(&mock_bin)?.permissions();
         perms.set_mode(0o755);
         fs::set_permissions(&mock_bin, perms)?;
     }
+
+    Ok(mock_bin)
+}
+
+#[test]
+fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    let mock_bin = create_mock_executable(root, "#!/bin/sh\necho 'Blender 4.2.0'\n")?;
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
     cmd.env("BLUP_ROOT", root).current_dir(root).args([
@@ -109,15 +136,7 @@ fn test_link_conflict_and_force() -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
-    // Create a mock executable
-    let mock_bin = root.join("mock_blender");
-    fs::write(&mock_bin, "#!/bin/sh\necho 'Blender 5.0.0'\n")?;
-    #[cfg(unix)]
-    {
-        let mut perms = fs::metadata(&mock_bin)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&mock_bin, perms)?;
-    }
+    let mock_bin = create_mock_executable(root, "#!/bin/sh\necho 'Blender 5.0.0'\n")?;
 
     // Link once
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -149,6 +168,23 @@ fn test_link_conflict_and_force() -> Result<(), Box<dyn std::error::Error>> {
     ]);
     cmd_force.assert().success();
 
+    // Linking with the name of an installed version must always fail, even with --force
+    let versions_dir = root.join("versions");
+    fs::create_dir_all(versions_dir.join("5.0.0"))?;
+
+    let mut cmd_installed_force = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_installed_force.env("BLUP_ROOT", root).args([
+        "link",
+        mock_bin.to_str().unwrap(),
+        "--as",
+        "5.0.0",
+        "--force",
+    ]);
+    cmd_installed_force
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("installed version"));
+
     Ok(())
 }
 
@@ -157,14 +193,7 @@ fn test_link_broken_path() -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
-    let mock_bin = root.join("mock_blender");
-    fs::write(&mock_bin, "#!/bin/sh\n")?;
-    #[cfg(unix)]
-    {
-        let mut perms = fs::metadata(&mock_bin)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&mock_bin, perms)?;
-    }
+    let mock_bin = create_mock_executable(root, "")?;
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
     cmd.env("BLUP_ROOT", root)
@@ -208,14 +237,7 @@ fn test_remove_linked_entry() -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
-    let mock_bin = root.join("mock_blender");
-    fs::write(&mock_bin, "#!/bin/sh\n")?;
-    #[cfg(unix)]
-    {
-        let mut perms = fs::metadata(&mock_bin)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&mock_bin, perms)?;
-    }
+    let mock_bin = create_mock_executable(root, "")?;
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
     cmd.env("BLUP_ROOT", root)

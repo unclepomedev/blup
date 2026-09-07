@@ -56,14 +56,17 @@ fn verify_executable_permission(path: &Path) -> Result<()> {
 fn ensure_name_available(as_name: &str, force: bool) -> Result<()> {
     let app_root = config::get_app_root()?;
     let install_dir = app_root.join("versions").join(as_name);
-    let installed_exists = install_dir.is_dir();
+    if install_dir.is_dir() {
+        bail!(
+            "An installed version named '{}' already exists. Cannot link with this name.",
+            as_name
+        );
+    }
 
     let settings = config::load()?;
-    let link_exists = settings.links.contains_key(as_name);
-
-    if (installed_exists || link_exists) && !force {
+    if settings.links.contains_key(as_name) && !force {
         bail!(
-            "A version or link named '{}' already exists. Use --force to overwrite.",
+            "A link named '{}' already exists. Use --force to overwrite.",
             as_name
         );
     }
