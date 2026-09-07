@@ -1,6 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
-use predicates::str::contains;
+use predicates::str::{contains, diff};
 use std::error::Error as StdError;
 use std::fs;
 
@@ -266,7 +266,7 @@ fn test_resolve_priority() -> Result<(), Box<dyn StdError>> {
         .env("BLUP_ROOT", root)
         .current_dir(root)
         .arg("resolve");
-    cmd_default.assert().success().stdout(contains("4.2.0"));
+    cmd_default.assert().success().stdout(diff("4.2.0\n"));
 
     // Case 3: .blender-version overrides default
     fs::write(root.join(".blender-version"), "5.0.0")?;
@@ -276,7 +276,11 @@ fn test_resolve_priority() -> Result<(), Box<dyn StdError>> {
         .env("BLUP_ROOT", root)
         .current_dir(root)
         .arg("resolve");
-    cmd_file.assert().success().stdout(contains("5.0.0"));
+    cmd_file
+        .assert()
+        .success()
+        .stdout(diff("5.0.0\n"))
+        .stdout(contains("4.2.0").not());
 
     // Case 4: CLI argument overrides .blender-version
     let mut cmd_arg = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -284,7 +288,12 @@ fn test_resolve_priority() -> Result<(), Box<dyn StdError>> {
         .env("BLUP_ROOT", root)
         .current_dir(root)
         .args(["resolve", "5.1.0"]);
-    cmd_arg.assert().success().stdout(contains("5.1.0"));
+    cmd_arg
+        .assert()
+        .success()
+        .stdout(diff("5.1.0\n"))
+        .stdout(contains("5.0.0").not())
+        .stdout(contains("4.2.0").not());
 
     Ok(())
 }
