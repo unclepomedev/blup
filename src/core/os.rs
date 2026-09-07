@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Represents the target platform (OS, architecture, and file extension).
 #[derive(Debug, PartialEq)]
@@ -35,7 +36,66 @@ pub fn detect_platform() -> Result<Platform> {
     })
 }
 
-/// Returns the expected path to the Blender executable within an installation directory.
+/// Resolves and normalizes an executable path provided by user.
+/// Supports standard absolute paths, mixed slashes, and MSYS/WSL style paths (e.g. `/c/...` -> `C:\...` on Windows).
+pub fn normalize_executable_path(raw_path: &str) -> Result<PathBuf> {
+    let raw = raw_path.trim();
+    if raw.is_empty() {
+        bail!("Executable path cannot be empty.");
+    }
+
+    #[allow(unused_mut)]
+    let mut path_str = raw.to_string();
+
+    #[cfg(windows)]
+    {
+        // Handle MSYS/WSL style paths: /c/Program Files/... or /c/... -> C:\Program Files\...
+        if (path_str.starts_with('/') || path_str.starts_with('\\')) && path_str.len() >= 3 {
+            let bytes = path_str.as_bytes();
+            if (bytes[0] == b'/' || bytes[0] == b'\\')
+                && bytes[1].is_ascii_alphabetic()
+                && (bytes[2] == b'/' || bytes[2] == b'\\')
+            {
+                let drive = (bytes[1] as char).to_ascii_uppercase();
+                let rest = &path_str[2..];
+                path_str = format!("{}:{}", drive, rest);
+            }
+        }
+        // Normalize forward slashes to backslashes on Windows
+        path_str = path_str.replace('/', "\\");
+    }
+
+    let path = PathBuf::from(&path_str);
+
+    // Require an absolute path
+    if !path.is_absolute() {
+        bail!("Path must be an absolute path: '{}'", raw_path);
+    }
+
+    Ok(path)
+}
+
+/// Detects the Blender version from an executable by executing `blender --version`.
+pub fn detect_blender_version(executable: &Path) -> Option<String> {
+    let output = Command::new(executable).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Typical output: Blender 4.2.0 (hash ...) / Blender 5.0.0 Alpha
+    for line in stdout.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("Blender ") {
+            let ver = rest.split_whitespace().next()?;
+            if !ver.is_empty() {
+                return Some(ver.to_string());
+            }
+        }
+    }
+    None
+}
+
 pub fn get_bin_path(install_dir: &Path) -> Result<PathBuf> {
     let os = env::consts::OS;
 

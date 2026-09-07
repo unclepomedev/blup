@@ -31,7 +31,7 @@ impl TestEnv {
 async fn test_e2e_lifecycle() -> anyhow::Result<()> {
     let env = TestEnv::new()?;
 
-    let target_version = "5.0.1";
+    let target_version = "5.2.1";
 
     println!("Using temp home: {:?}", env.root.path());
 
@@ -108,7 +108,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .assert()
         .success()
         .stdout(predicate::str::contains(dummy_version))
-        .stdout(predicate::str::contains("5.0.1").not());
+        .stdout(predicate::str::contains(target_version).not());
 
     tokio::fs::remove_file(&version_file).await?;
 

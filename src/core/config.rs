@@ -1,15 +1,70 @@
-use crate::core::version;
+use crate::core::{os, version};
 use anyhow::{Context, Result, bail};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// Configuration settings for the application.
-#[derive(Serialize, Deserialize, Default)]
+/// Represents a linked Blender executable entry.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct LinkedEntry {
+    pub path: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_version: Option<String>,
+}
+
+/// Returns true if a version string matches an installed version folder or registered link.
+pub fn is_version_or_link_installed(v: &str) -> Result<bool> {
+    let app_root = get_app_root()?;
+    let install_dir = app_root.join("versions").join(v);
+    if install_dir.is_dir() {
+        return Ok(true);
+    }
+
+    let settings = load().unwrap_or_default();
+    if settings.links.contains_key(v) {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+/// Resolves the executable path for a given version or link name.
+/// Returns the path and whether it is a link.
+pub fn get_executable_for_version(v: &str) -> Result<(PathBuf, bool)> {
+    let settings = load().unwrap_or_default();
+    if let Some(entry) = settings.links.get(v) {
+        if !entry.path.exists() {
+            bail!(
+                "Linked Blender '{}' executable does not exist at: {:?}",
+                v,
+                entry.path
+            );
+        }
+        return Ok((entry.path.clone(), true));
+    }
+
+    let app_root = get_app_root()?;
+    let install_dir = app_root.join("versions").join(v);
+    if !install_dir.is_dir() {
+        bail!(
+            "Blender {} is not installed or linked. Run `blup install {}` or `blup link <path> --as {}` first.",
+            v,
+            v,
+            v
+        );
+    }
+
+    let bin_path = os::get_bin_path(&install_dir)?;
+    Ok((bin_path, false))
+}
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
 pub struct Settings {
     pub default_version: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub links: HashMap<String, LinkedEntry>,
 }
 
 /// Returns the root directory where the application stores its data.
@@ -173,6 +228,7 @@ mod tests {
 
         let settings = Settings {
             default_version: Some("4.2.0".to_string()),
+            ..Default::default()
         };
         save(&settings)?;
 
@@ -214,6 +270,7 @@ mod tests {
 
         save(&Settings {
             default_version: Some("GlobalDefault".into()),
+            ..Default::default()
         })?;
 
         {
@@ -240,6 +297,7 @@ mod tests {
 
         save(&Settings {
             default_version: None,
+            ..Default::default()
         })?;
 
         let result = resolve_version(None);
@@ -264,6 +322,7 @@ mod tests {
 
         save(&Settings {
             default_version: Some("../invalid_version".into()),
+            ..Default::default()
         })?;
 
         let result = resolve_version(None);
