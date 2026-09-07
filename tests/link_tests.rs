@@ -18,7 +18,10 @@ fn create_mock_executable(dir: &Path, content: &str) -> Result<PathBuf, Box<dyn 
         let win_content = if content.is_empty() {
             "@echo off\r\n".to_string()
         } else {
-            format!("@echo off\r\n{}\r\n", content.replace("#!/bin/sh\n", "").replace('\'', ""))
+            format!(
+                "@echo off\r\n{}\r\n",
+                content.replace("#!/bin/sh\n", "").replace('\'', "")
+            )
         };
         fs::write(&mock_bin, win_content)?;
     }
