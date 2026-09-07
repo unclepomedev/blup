@@ -1,13 +1,13 @@
 use assert_cmd::Command;
 use blup::core::config::Settings;
-use predicates::prelude::*;
-use std::error::Error;
+use predicates::str::contains;
+use std::error::Error as StdError;
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-fn create_mock_executable(dir: &Path, content: &str) -> Result<PathBuf, Box<dyn Error>> {
+fn create_mock_executable(dir: &Path, content: &str) -> Result<PathBuf, Box<dyn StdError>> {
     #[cfg(windows)]
     let mock_bin = dir.join("mock_blender.bat");
     #[cfg(not(windows))]
@@ -46,7 +46,7 @@ fn create_mock_executable(dir: &Path, content: &str) -> Result<PathBuf, Box<dyn 
 }
 
 #[test]
-fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> {
+fn test_link_validation_and_success() -> Result<(), Box<dyn StdError>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
@@ -62,7 +62,7 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Linked '4.2-custom'"));
+        .stdout(contains("Linked '4.2-custom'"));
 
     // Verify settings.toml contains the link
     let settings_path = root.join("config").join("settings.toml");
@@ -79,8 +79,8 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
     list_cmd
         .assert()
         .success()
-        .stdout(predicate::str::contains("Linked Blender Executables:"))
-        .stdout(predicate::str::contains("4.2-custom"));
+        .stdout(contains("Linked Blender Executables:"))
+        .stdout(contains("4.2-custom"));
 
     // Test blup which finds the linked executable
     let mut which_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -92,7 +92,7 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
     which_cmd
         .assert()
         .success()
-        .stdout(predicate::str::contains(mock_bin.to_str().unwrap()));
+        .stdout(contains(mock_bin.to_str().unwrap()));
 
     // Test blup default can set the link
     let mut default_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -104,9 +104,7 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
     default_cmd
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Default Blender version set to 4.2-custom",
-        ));
+        .stdout(contains("Default Blender version set to 4.2-custom"));
 
     // Test blup which without args now uses default
     let mut which_def_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -118,7 +116,7 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
     which_def_cmd
         .assert()
         .success()
-        .stdout(predicate::str::contains(mock_bin.to_str().unwrap()));
+        .stdout(contains(mock_bin.to_str().unwrap()));
 
     // Test blup run executes the linked binary
     let mut run_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -127,15 +125,16 @@ fn test_link_validation_and_success() -> Result<(), Box<dyn std::error::Error>> 
         .current_dir(root)
         .args(["run", "4.2-custom"]);
 
-    run_cmd.assert().success().stdout(predicate::str::contains(
-        "Starting Blender 4.2-custom (linked)",
-    ));
+    run_cmd
+        .assert()
+        .success()
+        .stdout(contains("Starting Blender 4.2-custom (linked)"));
 
     Ok(())
 }
 
 #[test]
-fn test_link_conflict_and_force() -> Result<(), Box<dyn std::error::Error>> {
+fn test_link_conflict_and_force() -> Result<(), Box<dyn StdError>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
@@ -158,7 +157,7 @@ fn test_link_conflict_and_force() -> Result<(), Box<dyn std::error::Error>> {
     cmd_fail
         .assert()
         .failure()
-        .stderr(predicate::str::contains("already exists"));
+        .stderr(contains("already exists"));
 
     // Link with --force should succeed
     let mut cmd_force = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -186,13 +185,13 @@ fn test_link_conflict_and_force() -> Result<(), Box<dyn std::error::Error>> {
     cmd_installed_force
         .assert()
         .failure()
-        .stderr(predicate::str::contains("installed version"));
+        .stderr(contains("installed version"));
 
     Ok(())
 }
 
 #[test]
-fn test_link_broken_path() -> Result<(), Box<dyn std::error::Error>> {
+fn test_link_broken_path() -> Result<(), Box<dyn StdError>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
@@ -209,10 +208,7 @@ fn test_link_broken_path() -> Result<(), Box<dyn std::error::Error>> {
     // list should show broken link warning
     let mut list_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
     list_cmd.env("BLUP_ROOT", root).arg("list");
-    list_cmd
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("broken link"));
+    list_cmd.assert().success().stdout(contains("broken link"));
 
     // run should fail with clear error
     let mut run_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -220,7 +216,7 @@ fn test_link_broken_path() -> Result<(), Box<dyn std::error::Error>> {
     run_cmd
         .assert()
         .failure()
-        .stderr(predicate::str::contains("does not exist"));
+        .stderr(contains("does not exist"));
 
     // which should fail with clear error
     let mut which_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
@@ -230,13 +226,13 @@ fn test_link_broken_path() -> Result<(), Box<dyn std::error::Error>> {
     which_cmd
         .assert()
         .failure()
-        .stderr(predicate::str::contains("does not exist"));
+        .stderr(contains("does not exist"));
 
     Ok(())
 }
 
 #[test]
-fn test_remove_linked_entry() -> Result<(), Box<dyn std::error::Error>> {
+fn test_remove_linked_entry() -> Result<(), Box<dyn StdError>> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
 
@@ -252,9 +248,10 @@ fn test_remove_linked_entry() -> Result<(), Box<dyn std::error::Error>> {
     rm_cmd
         .env("BLUP_ROOT", root)
         .args(["remove", "removable-link", "-y"]);
-    rm_cmd.assert().success().stdout(predicate::str::contains(
-        "Link 'removable-link' removed successfully",
-    ));
+    rm_cmd
+        .assert()
+        .success()
+        .stdout(contains("Link 'removable-link' removed successfully"));
 
     // Ensure mock executable was NOT deleted!
     assert!(mock_bin.exists());
@@ -266,7 +263,127 @@ fn test_remove_linked_entry() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn config_load(root: &Path) -> Result<Settings, Box<dyn Error>> {
+#[test]
+fn test_remove_linked_entry_clears_default() -> Result<(), Box<dyn StdError>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    let mock_bin = create_mock_executable(root, "")?;
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root)
+        .args(["link", mock_bin.to_str().unwrap(), "--as", "default-link"]);
+    cmd.assert().success();
+
+    // Set as default
+    let mut def_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    def_cmd
+        .env("BLUP_ROOT", root)
+        .args(["default", "default-link"]);
+    def_cmd.assert().success();
+
+    let settings = config_load(root)?;
+    assert_eq!(settings.default_version.as_deref(), Some("default-link"));
+
+    // Remove the link
+    let mut rm_cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    rm_cmd
+        .env("BLUP_ROOT", root)
+        .args(["remove", "default-link", "-y"]);
+    rm_cmd
+        .assert()
+        .success()
+        .stdout(contains("Cleared default version."));
+
+    let settings_after = config_load(root)?;
+    assert_eq!(settings_after.default_version, None);
+
+    Ok(())
+}
+
+#[test]
+fn test_link_validation_errors() -> Result<(), Box<dyn StdError>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    let mock_bin = create_mock_executable(root, "")?;
+
+    // Invalid alias name with path separators
+    let mut cmd_sep = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_sep.env("BLUP_ROOT", root).args([
+        "link",
+        mock_bin.to_str().unwrap(),
+        "--as",
+        "custom/nested",
+    ]);
+    cmd_sep
+        .assert()
+        .failure()
+        .stderr(contains("cannot contain path separators"));
+
+    // Invalid alias name with parent directory traversal
+    let mut cmd_parent = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_parent
+        .env("BLUP_ROOT", root)
+        .args(["link", mock_bin.to_str().unwrap(), "--as", ".."]);
+    cmd_parent
+        .assert()
+        .failure()
+        .stderr(contains("not a valid"));
+
+    // Empty alias name
+    let mut cmd_empty = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_empty
+        .env("BLUP_ROOT", root)
+        .args(["link", mock_bin.to_str().unwrap(), "--as", "   "]);
+    cmd_empty
+        .assert()
+        .failure()
+        .stderr(contains("Name cannot be empty"));
+
+    // Non-existent path
+    let non_existent = root.join("non_existent_blender");
+    let mut cmd_notfound = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_notfound.env("BLUP_ROOT", root).args([
+        "link",
+        non_existent.to_str().unwrap(),
+        "--as",
+        "test-valid-name",
+    ]);
+    cmd_notfound
+        .assert()
+        .failure()
+        .stderr(contains("does not exist"));
+
+    // Directory path (not a regular file)
+    let dir_path = root.join("dummy_dir");
+    fs::create_dir(&dir_path)?;
+    let mut cmd_dir = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_dir
+        .env("BLUP_ROOT", root)
+        .args(["link", dir_path.to_str().unwrap(), "--as", "test-dir"]);
+    cmd_dir
+        .assert()
+        .failure()
+        .stderr(contains("Path is not a regular file"));
+
+    // Relative path (must be absolute)
+    let mut cmd_relative = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd_relative.env("BLUP_ROOT", root).current_dir(root).args([
+        "link",
+        "relative/path/blender",
+        "--as",
+        "test-rel",
+    ]);
+    cmd_relative
+        .assert()
+        .failure()
+        .stderr(contains("Path must be an absolute path"));
+
+    Ok(())
+}
+
+fn config_load(root: &Path) -> Result<Settings, Box<dyn StdError>> {
     let settings_path = root.join("config").join("settings.toml");
     if !settings_path.exists() {
         return Ok(Default::default());

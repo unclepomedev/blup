@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use predicates::str::contains;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -41,7 +42,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("--remote")
         .assert()
         .success()
-        .stdout(predicate::str::contains(target_version));
+        .stdout(contains(target_version));
 
     println!("Step 2: Installing {}...", target_version);
     env.blup()
@@ -54,7 +55,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("list")
         .assert()
         .success()
-        .stdout(predicate::str::contains(target_version));
+        .stdout(contains(target_version));
 
     println!("Step 3: Setting default version...");
     env.blup()
@@ -67,7 +68,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("default")
         .assert()
         .success()
-        .stdout(predicate::str::contains(target_version));
+        .stdout(contains(target_version));
 
     println!("Step 4: Verifying binary path resolution...");
 
@@ -92,9 +93,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("which")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            full_expected_path.to_str().unwrap(),
-        ));
+        .stdout(contains(full_expected_path.to_str().unwrap()));
 
     println!("Step 5: Testing .blender-version priority...");
 
@@ -107,8 +106,8 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("resolve")
         .assert()
         .success()
-        .stdout(predicate::str::contains(dummy_version))
-        .stdout(predicate::str::contains(target_version).not());
+        .stdout(contains(dummy_version))
+        .stdout(contains(target_version).not());
 
     tokio::fs::remove_file(&version_file).await?;
 
@@ -120,7 +119,7 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Blender"));
+        .stdout(contains("Blender"));
 
     println!("Step 7: Uninstalling...");
     env.blup()
@@ -138,7 +137,56 @@ async fn test_e2e_lifecycle() -> anyhow::Result<()> {
         .arg("list")
         .assert()
         .success()
-        .stdout(predicate::str::contains(target_version).not());
+        .stdout(contains(target_version).not());
+
+    println!("Step 8: Testing linked executable in E2E lifecycle...");
+    // Create a dummy mock executable in another folder outside BLUP_ROOT
+    let external_dir = tempfile::tempdir()?;
+    #[cfg(windows)]
+    let mock_bin = external_dir.path().join("external_blender.bat");
+    #[cfg(not(windows))]
+    let mock_bin = external_dir.path().join("external_blender");
+
+    #[cfg(windows)]
+    std::fs::write(&mock_bin, "@echo off\r\necho Blender 5.3.0-custom\r\n")?;
+    #[cfg(not(windows))]
+    {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        fs::write(&mock_bin, "#!/bin/sh\necho 'Blender 5.3.0-custom'\n")?;
+        let mut perms = fs::metadata(&mock_bin)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&mock_bin, perms)?;
+    }
+
+    // Link it
+    env.blup()
+        .args(["link", mock_bin.to_str().unwrap(), "--as", "linked-custom"])
+        .assert()
+        .success();
+
+    // Verify which resolves to the external mock binary
+    env.blup()
+        .args(["which", "linked-custom"])
+        .assert()
+        .success()
+        .stdout(contains(mock_bin.to_str().unwrap()));
+
+    // Verify running works
+    env.blup()
+        .args(["run", "linked-custom", "--", "--version"])
+        .assert()
+        .success()
+        .stdout(contains("Blender 5.3.0-custom"));
+
+    // Remove the linked entry
+    env.blup()
+        .args(["remove", "linked-custom", "-y"])
+        .assert()
+        .success();
+
+    // Verify mock binary still exists externally
+    assert!(mock_bin.exists());
 
     Ok(())
 }
