@@ -182,4 +182,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_normalize_executable_path() {
+        assert!(normalize_executable_path("   ").is_err());
+        assert!(normalize_executable_path("relative/path").is_err());
+
+        #[cfg(windows)]
+        {
+            assert_eq!(
+                normalize_executable_path("/c/Program Files/Blender/blender.exe").unwrap(),
+                PathBuf::from("C:\\Program Files\\Blender\\blender.exe")
+            );
+            assert_eq!(
+                normalize_executable_path("\\c\\Blender\\blender.exe").unwrap(),
+                PathBuf::from("C:\\Blender\\blender.exe")
+            );
+            assert_eq!(
+                normalize_executable_path("C:/Blender/blender.exe").unwrap(),
+                PathBuf::from("C:\\Blender\\blender.exe")
+            );
+        }
+
+        #[cfg(not(windows))]
+        {
+            assert_eq!(
+                normalize_executable_path("/usr/local/bin/blender").unwrap(),
+                PathBuf::from("/usr/local/bin/blender")
+            );
+        }
+    }
 }

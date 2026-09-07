@@ -1,19 +1,20 @@
 use blup::core::{downloader, extractor};
 use reqwest::Client;
+use std::fs;
 use std::io::{Cursor, Write};
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 use zip::write::FileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
 #[tokio::test]
 async fn test_download_and_extract_flow() {
     let mock_server = MockServer::start().await;
 
     let buffer = {
-        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
 
-        let options =
-            FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+        let options = FileOptions::<()>::default().compression_method(CompressionMethod::Stored);
 
         zip.start_file("Blender5.0/blender.exe", options).unwrap();
         zip.write_all(b"fake blender binary content").unwrap();
@@ -38,7 +39,7 @@ async fn test_download_and_extract_flow() {
 
     let extract_dir = temp_dir.path().join("extracted");
 
-    let meta = std::fs::metadata(&archive_path).unwrap();
+    let meta = fs::metadata(&archive_path).unwrap();
     println!("Downloaded file size: {} bytes", meta.len());
 
     let result = extractor::extract(&archive_path, &extract_dir);
