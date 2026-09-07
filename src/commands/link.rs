@@ -2,7 +2,6 @@ use crate::core::config::LinkedEntry;
 use crate::core::{config, os, version};
 use anyhow::{Result, bail};
 use console::style;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Links an existing Blender executable into blup's managed store.
@@ -40,6 +39,7 @@ fn resolve_and_verify_executable(path_str: &str) -> Result<PathBuf> {
 fn verify_executable_permission(path: &Path) -> Result<()> {
     #[cfg(unix)]
     {
+        use std::fs;
         use std::os::unix::fs::PermissionsExt;
         let metadata = fs::metadata(path)?;
         if metadata.permissions().mode() & 0o111 == 0 {
