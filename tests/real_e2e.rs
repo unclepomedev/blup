@@ -31,7 +31,7 @@ impl TestEnv {
 async fn test_e2e_lifecycle() -> anyhow::Result<()> {
     let env = TestEnv::new()?;
 
-    let target_version = "5.0.1";
+    let target_version = "5.2.1";
 
     println!("Using temp home: {:?}", env.root.path());
 
