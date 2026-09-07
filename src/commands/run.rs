@@ -1,4 +1,4 @@
-use crate::core::{config, os, version};
+use crate::core::{config, version};
 use anyhow::{Context, Result, bail};
 use console::style;
 use std::fs;
@@ -7,46 +7,19 @@ use std::process::Command;
 
 pub fn run(version_arg: Option<String>, scripts: Option<String>, args: Vec<String>) -> Result<()> {
     let (version_arg, args) = prepare_run_args(version_arg, args);
-    let mut version_str = config::resolve_version(version_arg)?;
+    let version_str = resolve_target_version(version_arg)?;
 
-    if version_str == "daily" {
-        let actual_version = version::find_latest_daily_installed()?;
-        println!(
-            "{} Resolved 'daily' to installed version: {}",
-            style("i").blue(),
-            style(&actual_version).bold()
-        );
-        version_str = actual_version;
-    }
-
-    let app_root = config::get_app_root()?;
-    let install_dir = app_root.join("versions").join(&version_str);
-
-    if !install_dir.exists() {
-        bail!(
-            "Blender {} is not installed. Run `blup install {}` first.",
-            version_str,
-            version_str
-        );
-    }
-
-    let bin_path = os::get_bin_path(&install_dir)?;
+    let (bin_path, is_link) = config::get_executable_for_version(&version_str)?;
 
     println!(
-        "{} Starting Blender {}...",
+        "{} Starting Blender {}{}...",
         style("==>").green(),
-        version_str
+        version_str,
+        if is_link { " (linked)" } else { "" }
     );
 
     let mut command = Command::new(bin_path);
-
-    if let Some(scripts_path) = scripts {
-        let abs_path = fs::canonicalize(&scripts_path)
-            .context(format!("Failed to resolve scripts path: {}", scripts_path))?;
-
-        println!("{} Scripts path: {:?}", style("->").dim(), abs_path);
-        command.env("BLENDER_USER_SCRIPTS", abs_path);
-    }
+    configure_scripts_env(&mut command, scripts.as_deref())?;
 
     let status = command
         .args(&args)
@@ -57,6 +30,33 @@ pub fn run(version_arg: Option<String>, scripts: Option<String>, args: Vec<Strin
         bail!("Blender exited with non-zero status code");
     }
 
+    Ok(())
+}
+
+fn resolve_target_version(version_arg: Option<String>) -> Result<String> {
+    let version_str = config::resolve_version(version_arg)?;
+
+    if version_str == "daily" {
+        let actual_version = version::find_latest_daily_installed()?;
+        println!(
+            "{} Resolved 'daily' to installed version: {}",
+            style("i").blue(),
+            style(&actual_version).bold()
+        );
+        Ok(actual_version)
+    } else {
+        Ok(version_str)
+    }
+}
+
+fn configure_scripts_env(command: &mut Command, scripts: Option<&str>) -> Result<()> {
+    if let Some(scripts_path) = scripts {
+        let abs_path = fs::canonicalize(scripts_path)
+            .context(format!("Failed to resolve scripts path: {}", scripts_path))?;
+
+        println!("{} Scripts path: {:?}", style("->").dim(), abs_path);
+        command.env("BLENDER_USER_SCRIPTS", abs_path);
+    }
     Ok(())
 }
 

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
-use std::fs;
+use std::fs::{self, File};
+use std::io::copy;
 use std::path::{Component, Path, PathBuf};
 
 /// Extracts the specified archive to the destination directory.
@@ -77,8 +78,8 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
             {
                 fs::create_dir_all(p)?;
             }
-            let mut outfile = fs::File::create(&outpath)?;
-            std::io::copy(&mut file, &mut outfile)?;
+            let mut outfile = File::create(&outpath)?;
+            copy(&mut file, &mut outfile)?;
         }
 
         #[cfg(unix)]

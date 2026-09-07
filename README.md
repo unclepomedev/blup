@@ -45,6 +45,7 @@ cargo install --path .
 
 ```shell
 blup install 5.0.0                   # Download & Install
+blup link /path/to/blender --as custom # Link existing executable
 blup default 5.0.0                   # Set global default
 blup list                            # Check installed versions
 blup which                           # Show executable path

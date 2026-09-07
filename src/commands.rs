@@ -1,5 +1,6 @@
 pub mod default;
 pub mod install;
+pub mod link;
 pub mod list;
 pub mod remove;
 pub mod resolve;

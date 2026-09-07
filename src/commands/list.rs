@@ -1,3 +1,4 @@
+use crate::core::config::{LinkedEntry, Settings};
 use crate::core::{config, daily, os};
 use anyhow::Result;
 use console::style;
@@ -42,39 +43,109 @@ fn print_installed_list(installed_versions: &HashSet<String>) {
     let active_ver = config::resolve_version(None).unwrap_or_default();
 
     println!("{}", style("Installed Blender Versions:").bold());
-    if installed_versions.is_empty() {
+    if installed_versions.is_empty() && settings.links.is_empty() {
         println!("  (No versions installed)");
-    } else {
-        let mut v_list: Vec<_> = installed_versions.iter().collect();
-        v_list.sort();
-        for v in v_list {
-            let is_default = v == default_ver;
-            let is_active = v == &active_ver;
+        return;
+    }
 
-            if is_active {
-                let suffix = if is_default {
-                    style("(default)").dim()
-                } else {
-                    style("(active)").dim()
-                };
+    print_installed_version_entries(installed_versions, default_ver, &active_ver);
 
-                println!(
-                    "  {} {} {}",
-                    style("*").green().bold(),
-                    style(v).green().bold(),
-                    suffix
-                );
+    if !settings.links.is_empty() {
+        print_linked_entries(&settings, default_ver, &active_ver);
+    }
+}
+
+fn print_installed_version_entries(
+    installed_versions: &HashSet<String>,
+    default_ver: &str,
+    active_ver: &str,
+) {
+    let mut v_list: Vec<_> = installed_versions.iter().collect();
+    v_list.sort();
+    for v in v_list {
+        let is_default = v == default_ver;
+        let is_active = v == active_ver;
+
+        if is_active {
+            let suffix = if is_default {
+                style("(default)").dim()
             } else {
-                let suffix = if is_default {
-                    format!(" {}", style("(default)").dim())
-                } else {
-                    String::new()
-                };
+                style("(active)").dim()
+            };
 
-                println!("  {} {}{}", style("•").dim(), v, suffix);
-            }
+            println!(
+                "  {} {} {}",
+                style("*").green().bold(),
+                style(v).green().bold(),
+                suffix
+            );
+        } else {
+            let suffix = if is_default {
+                format!(" {}", style("(default)").dim())
+            } else {
+                String::new()
+            };
+
+            println!("  {} {}{}", style("•").dim(), v, suffix);
         }
     }
+}
+
+fn print_linked_entries(settings: &Settings, default_ver: &str, active_ver: &str) {
+    println!("\n{}", style("Linked Blender Executables:").bold());
+    let mut links: Vec<_> = settings.links.iter().collect();
+    links.sort_by_key(|(name, _)| *name);
+
+    for (name, entry) in links {
+        let is_default = name.as_str() == default_ver;
+        let is_active = name.as_str() == active_ver;
+        print_single_link_entry(name, entry, is_default, is_active);
+    }
+}
+
+fn print_single_link_entry(name: &str, entry: &LinkedEntry, is_default: bool, is_active: bool) {
+    let exists = entry.path.exists();
+
+    let mut notes = Vec::new();
+    if let Some(ref ver) = entry.detected_version {
+        notes.push(ver.clone());
+    }
+    if !exists {
+        notes.push(style("broken link: executable not found").red().to_string());
+    }
+
+    let notes_str = if notes.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", notes.join(", "))
+    };
+
+    let suffix = if is_default && is_active {
+        format!(" {}", style("(default, active)").dim())
+    } else if is_default {
+        format!(" {}", style("(default)").dim())
+    } else if is_active {
+        format!(" {}", style("(active)").dim())
+    } else {
+        String::new()
+    };
+
+    let marker = if is_active {
+        style("*").green().bold()
+    } else {
+        style("•").dim()
+    };
+
+    let name_styled = if is_active {
+        style(name).green().bold().to_string()
+    } else {
+        name.to_string()
+    };
+
+    println!(
+        "  {} {} -> {:?}{}{}",
+        marker, name_styled, entry.path, notes_str, suffix
+    );
 }
 
 async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> {

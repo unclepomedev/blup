@@ -1,21 +1,14 @@
-use crate::core::{config, os};
-use anyhow::{Result, bail};
+use crate::core::{config, version};
+use anyhow::Result;
 
 pub fn run(target_version: Option<String>) -> Result<()> {
-    let version = config::resolve_version(target_version)?;
+    let mut version = config::resolve_version(target_version)?;
 
-    let app_root = config::get_app_root()?;
-    let install_dir = app_root.join("versions").join(&version);
-
-    if !install_dir.is_dir() {
-        bail!(
-            "Blender {} is not installed. Run `blup install {}` first.",
-            version,
-            version
-        );
+    if version == "daily" {
+        version = version::find_latest_daily_installed()?;
     }
 
-    let bin_path = os::get_bin_path(&install_dir)?;
+    let (bin_path, _) = config::get_executable_for_version(&version)?;
 
     println!("{}", bin_path.display());
     Ok(())

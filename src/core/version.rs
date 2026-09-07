@@ -18,6 +18,26 @@ pub fn extract_filename_from_url(url: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not determine archive filename from URL: {}", url))
 }
 
+/// Validates an alias or linked version name specified via `--as <name>`.
+/// Allowed: any non-empty string that doesn't contain path traversal or path separator characters.
+pub fn validate_link_name(name: &str) -> Result<()> {
+    if name.trim().is_empty() {
+        bail!("Name cannot be empty");
+    }
+    if name == "." || name == ".." {
+        bail!("'{}' is not a valid name", name);
+    }
+    if name.contains('/') || name.contains('\\') {
+        bail!(
+            "Name cannot contain path separators ('/' or '\\'): '{}'",
+            name
+        );
+    }
+    // Also validate standard component
+    validate_version_string(name)?;
+    Ok(())
+}
+
 /// Validates that a version string is safe and doesn't contain path traversal characters.
 /// Note: This intentionally does not enforce a strict format (like containing dots)
 /// to allow users to reference local custom build directories (e.g. "custom-build-v1").

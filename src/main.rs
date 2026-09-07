@@ -91,6 +91,21 @@ enum Commands {
         #[arg(value_name = "VERSION")]
         target_version: Option<String>,
     },
+
+    /// Link an existing Blender executable into blup management
+    Link {
+        /// Path to the existing Blender executable
+        #[arg(value_name = "PATH")]
+        path: String,
+
+        /// Identifier to register under (e.g. "4.2-custom", "5.0.0")
+        #[arg(long = "as", value_name = "NAME")]
+        as_name: String,
+
+        /// Overwrite if name already exists
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[tokio::main]
@@ -130,6 +145,13 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Which { target_version } => {
             commands::which::run(target_version)?;
+        }
+        Commands::Link {
+            path,
+            as_name,
+            force,
+        } => {
+            commands::link::run(&path, &as_name, force)?;
         }
     }
 

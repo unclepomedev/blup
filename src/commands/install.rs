@@ -1,3 +1,5 @@
+use crate::commands::default;
+use crate::core::os::Platform;
 use crate::core::{config, daily, downloader, extractor, os, version};
 use anyhow::{Result, bail};
 use chrono::DateTime;
@@ -26,6 +28,14 @@ pub async fn run(
         resolve_stable_version(&client, &target_version, &platform).await?
     };
 
+    let settings = config::load().unwrap_or_default();
+    if settings.links.contains_key(&version_name) {
+        bail!(
+            "Cannot install version '{}': a link with the same name already exists. Remove or rename the link first.",
+            version_name
+        );
+    }
+
     let install_dir = app_root.join("versions").join(&version_name);
 
     if install_dir.exists() {
@@ -36,7 +46,7 @@ pub async fn run(
             install_dir
         );
         if set_default {
-            super::default::run(Some(version_name))?;
+            default::run(Some(version_name))?;
         }
         return Ok(());
     }
@@ -64,7 +74,7 @@ pub async fn run(
     println!("    Location: {:?}", install_dir);
 
     if set_default {
-        super::default::run(Some(version_name))?;
+        default::run(Some(version_name))?;
     } else if is_daily {
         println!(
             "    To run this version: {}",
@@ -78,7 +88,7 @@ pub async fn run(
 async fn resolve_stable_version(
     client: &Client,
     target_version: &str,
-    platform: &os::Platform,
+    platform: &Platform,
 ) -> Result<(String, String, Option<String>)> {
     let download_url = version::build_url(version::OFFICIAL_URL, target_version, platform);
     let target_filename = version::extract_filename_from_url(&download_url).unwrap_or_default();
@@ -103,7 +113,7 @@ async fn resolve_stable_version(
 async fn resolve_daily_version(
     client: &Client,
     target_version: &str,
-    platform: &os::Platform,
+    platform: &Platform,
 ) -> Result<(String, String, Option<String>)> {
     println!(
         "{} Fetching daily build list for '{}'...",

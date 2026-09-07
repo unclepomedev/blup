@@ -4,8 +4,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::env;
-use std::io::IsTerminal;
-use std::io::Read;
+use std::fs::File as StdFile;
+use std::io::{IsTerminal, Read, stderr};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -54,7 +54,7 @@ pub async fn verify_checksum(file_path: &Path, expected_checksum: &str) -> Resul
 }
 
 fn verify_checksum_sync(file_path: &Path, expected_checksum: &str) -> Result<()> {
-    let mut file = std::fs::File::open(file_path)?;
+    let mut file = StdFile::open(file_path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0; 8192];
 
@@ -99,7 +99,7 @@ pub fn find_checksum_in_list(list_content: &str, target_filename: &str) -> Optio
 
 fn create_progress_bar(len: Option<u64>) -> Result<ProgressBar> {
     let is_ci = env::var("CI").is_ok();
-    let is_terminal = std::io::stderr().is_terminal();
+    let is_terminal = stderr().is_terminal();
     if is_ci || !is_terminal {
         return Ok(ProgressBar::hidden());
     }
