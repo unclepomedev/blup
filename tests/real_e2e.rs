@@ -9,6 +9,101 @@ struct TestEnv {
     bin_path: PathBuf,
 }
 
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            if let Some(&'[') = chars.peek() {
+                chars.next();
+                // Consume characters until 'm' or end of escape sequence
+                for next in chars.by_ref() {
+                    if next.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+fn parse_latest_stable_version(output: &str) -> anyhow::Result<String> {
+    let plain_output = strip_ansi(output);
+    let mut in_stable_section = false;
+
+    for line in plain_output.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("Stable Releases (Active Support):") {
+            in_stable_section = true;
+            continue;
+        }
+
+        if in_stable_section {
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.ends_with(':') {
+                // Next section reached
+                break;
+            }
+
+            // depends on the format of `commands::list`
+            let content = trimmed.trim_start_matches(|c: char| c == '*' || c.is_whitespace());
+            if let Some(version) = content.split_whitespace().next() {
+                // Validate that version looks like a semantic blender version (e.g., "5.2.2")
+                if version.chars().all(|c| c.is_ascii_digit() || c == '.') && version.contains('.')
+                {
+                    return Ok(version.to_string());
+                } else {
+                    anyhow::bail!(
+                        "Parsed candidate '{}' in Stable Releases does not look like a valid version format",
+                        version
+                    );
+                }
+            }
+        }
+    }
+
+    anyhow::bail!(
+        "Failed to find any stable release version in `blup list --remote` output:\n{}",
+        plain_output
+    );
+}
+
+#[test]
+fn test_helper_parse_latest_stable_version() {
+    let sample_output = r#"
+Fetching remote versions...
+
+Daily Builds (builder.blender.org):
+  5.3.0-alpha (Alpha, 931bb2e)
+
+Stable Releases (Active Support):
+  5.2.2 (LTS)
+  5.1.2
+* 5.0.1 (Installed)
+  4.5.14 (LTS)
+  4.4.3
+"#;
+    let version = parse_latest_stable_version(sample_output).unwrap();
+    assert_eq!(version, "5.2.2");
+
+    let sample_installed_first = r#"
+Stable Releases (Active Support):
+* 5.2.2 (LTS, Installed)
+  5.1.2
+"#;
+    let version = parse_latest_stable_version(sample_installed_first).unwrap();
+    assert_eq!(version, "5.2.2");
+
+    let missing_section = "Daily Builds (builder.blender.org):\n  5.3.0-alpha\n";
+    assert!(parse_latest_stable_version(missing_section).is_err());
+}
+
 impl TestEnv {
     fn new() -> anyhow::Result<Self> {
         let root = TempDir::new()?;
@@ -32,17 +127,22 @@ impl TestEnv {
 async fn test_e2e_lifecycle() -> anyhow::Result<()> {
     let env = TestEnv::new()?;
 
-    let target_version = "5.2.1";
-
     println!("Using temp home: {:?}", env.root.path());
 
     println!("Step 1: Checking remote list...");
-    env.blup()
-        .arg("list")
-        .arg("--remote")
-        .assert()
-        .success()
-        .stdout(contains(target_version));
+    let output = env.blup().arg("list").arg("--remote").output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "`blup list --remote` failed with status {:?}:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let stdout = String::from_utf8(output.stdout)?;
+
+    let target_version = parse_latest_stable_version(&stdout)?;
+    let target_version = target_version.as_str();
+    println!("Dynamically selected target version: {}", target_version);
 
     println!("Step 2: Installing {}...", target_version);
     env.blup()
