@@ -30,48 +30,51 @@ fn strip_ansi(s: &str) -> String {
     result
 }
 
+fn is_valid_version(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+}
+
+fn extract_version_candidate(line: &str) -> Option<&str> {
+    line.trim()
+        .trim_start_matches(|c: char| c == '*' || c.is_whitespace())
+        .split_whitespace()
+        .next()
+}
+
+fn extract_stable_section_lines(output: &str) -> impl Iterator<Item = &str> {
+    output
+        .lines()
+        .map(str::trim)
+        .skip_while(|line| !line.starts_with("Stable Releases (Active Support):"))
+        .skip(1)
+        .take_while(|line| !line.ends_with(':'))
+        .filter(|line| !line.is_empty())
+}
+
 fn parse_latest_stable_version(output: &str) -> anyhow::Result<String> {
     let plain_output = strip_ansi(output);
-    let mut in_stable_section = false;
 
-    for line in plain_output.lines() {
-        let trimmed = line.trim();
+    let candidate = extract_stable_section_lines(&plain_output)
+        .find_map(extract_version_candidate)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to find any stable release version in `blup list --remote` output:\n{}",
+                plain_output
+            )
+        })?;
 
-        if trimmed.starts_with("Stable Releases (Active Support):") {
-            in_stable_section = true;
-            continue;
-        }
-
-        if in_stable_section {
-            if trimmed.is_empty() {
-                continue;
-            }
-            if trimmed.ends_with(':') {
-                // Next section reached
-                break;
-            }
-
-            // depends on the format of `commands::list`
-            let content = trimmed.trim_start_matches(|c: char| c == '*' || c.is_whitespace());
-            if let Some(version) = content.split_whitespace().next() {
-                // Validate that version looks like a semantic blender version (e.g., "5.2.2")
-                if version.chars().all(|c| c.is_ascii_digit() || c == '.') && version.contains('.')
-                {
-                    return Ok(version.to_string());
-                } else {
-                    anyhow::bail!(
-                        "Parsed candidate '{}' in Stable Releases does not look like a valid version format",
-                        version
-                    );
-                }
-            }
-        }
+    if is_valid_version(candidate) {
+        Ok(candidate.to_string())
+    } else {
+        anyhow::bail!(
+            "Parsed candidate '{}' in Stable Releases does not look like a valid version format",
+            candidate
+        )
     }
-
-    anyhow::bail!(
-        "Failed to find any stable release version in `blup list --remote` output:\n{}",
-        plain_output
-    );
 }
 
 #[test]
@@ -102,6 +105,15 @@ Stable Releases (Active Support):
 
     let missing_section = "Daily Builds (builder.blender.org):\n  5.3.0-alpha\n";
     assert!(parse_latest_stable_version(missing_section).is_err());
+
+    let invalid_double_dot = "Stable Releases (Active Support):\n  5..2\n";
+    assert!(parse_latest_stable_version(invalid_double_dot).is_err());
+
+    let invalid_four_parts = "Stable Releases (Active Support):\n  5.2.2.1\n";
+    assert!(parse_latest_stable_version(invalid_four_parts).is_err());
+
+    let invalid_two_parts = "Stable Releases (Active Support):\n  5.2\n";
+    assert!(parse_latest_stable_version(invalid_two_parts).is_err());
 }
 
 impl TestEnv {
