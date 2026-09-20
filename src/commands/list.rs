@@ -1,5 +1,5 @@
 use crate::core::config::{LinkedEntry, Settings};
-use crate::core::{config, daily, os};
+use crate::core::{archive, config, daily, os, version};
 use anyhow::Result;
 use console::style;
 use reqwest::Client;
@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::time::Duration;
 
-pub async fn run(remote: bool) -> Result<()> {
+pub async fn run(remote: bool, all: bool) -> Result<()> {
     let installed_versions = get_installed_versions()?;
 
     if !remote {
@@ -15,7 +15,7 @@ pub async fn run(remote: bool) -> Result<()> {
         return Ok(());
     }
 
-    list_remote_builds(&installed_versions).await?;
+    list_remote_builds(&installed_versions, all).await?;
     Ok(())
 }
 
@@ -148,7 +148,7 @@ fn print_single_link_entry(name: &str, entry: &LinkedEntry, is_default: bool, is
     );
 }
 
-async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> {
+async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> Result<()> {
     println!("{}", style("Fetching remote versions...").dim());
 
     let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
@@ -200,7 +200,30 @@ async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> 
         );
     }
 
+    if all {
+        print_all_releases(&client, &platform, installed_versions).await?;
+    }
+
     println!(); // Footer margin
+    Ok(())
+}
+
+async fn print_all_releases(
+    client: &Client,
+    platform: &os::Platform,
+    installed_versions: &HashSet<String>,
+) -> Result<()> {
+    let versions = archive::fetch_all_versions(client, version::OFFICIAL_URL, platform).await?;
+
+    println!("\n{}", style("All Releases (download.blender.org):").bold());
+    if versions.is_empty() {
+        println!("  (None found for this platform)");
+    }
+    for v in &versions {
+        let is_lts = daily::is_lts(v);
+        print_remote_entry(v, v, installed_versions, "", is_lts);
+    }
+
     Ok(())
 }
 

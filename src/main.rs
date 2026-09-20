@@ -15,7 +15,7 @@ struct Cli {
 enum Commands {
     /// Install a specific version of Blender
     Install {
-        /// The version to install (e.g. "5.0.0", "4.2.0")
+        /// The version to install (e.g. "5.2.2", "4.5.14")
         #[arg(value_name = "VERSION")]
         target_version: Option<String>,
 
@@ -38,6 +38,10 @@ enum Commands {
         /// List remote versions available for download
         #[arg(long, short = 'r')]
         remote: bool,
+
+        /// List all versions from the official archive (requires --remote)
+        #[arg(long, short = 'a', requires = "remote")]
+        all: bool,
     },
 
     /// Run a specific version of Blender
@@ -98,7 +102,7 @@ enum Commands {
         #[arg(value_name = "PATH")]
         path: String,
 
-        /// Identifier to register under (e.g. "4.2-custom", "5.0.0")
+        /// Identifier to register under (e.g. "5.2-custom", "5.2.2")
         #[arg(long = "as", value_name = "NAME")]
         as_name: String,
 
@@ -121,8 +125,8 @@ async fn main() -> anyhow::Result<()> {
         } => {
             commands::install::run(target_version, daily, default, skip_checksum).await?;
         }
-        Commands::List { remote } => {
-            commands::list::run(remote).await?;
+        Commands::List { remote, all } => {
+            commands::list::run(remote, all).await?;
         }
         Commands::Run {
             target_version,

@@ -368,3 +368,18 @@ fn test_which_uninstalled_and_no_default() -> Result<(), Box<dyn StdError>> {
 
     Ok(())
 }
+
+#[test]
+fn test_list_all_requires_remote() -> Result<(), Box<dyn StdError>> {
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_blup"));
+    cmd.env("BLUP_ROOT", root)
+        .current_dir(root)
+        .args(["list", "--all"]);
+
+    cmd.assert().failure().stderr(contains("--remote"));
+
+    Ok(())
+}
