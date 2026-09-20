@@ -52,7 +52,7 @@ fn sanitize_and_strip_path(path: &Path) -> Result<Option<PathBuf>> {
 }
 
 fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
-    let file = fs::File::open(archive_path)?;
+    let file = File::open(archive_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
     for i in 0..archive.len() {
@@ -94,7 +94,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 }
 
 fn extract_tar_xz(archive_path: &Path, dest_dir: &Path) -> Result<()> {
-    let file = fs::File::open(archive_path)?;
+    let file = File::open(archive_path)?;
     let tar = xz2::read::XzDecoder::new(file);
     let mut archive = tar::Archive::new(tar);
 
@@ -200,7 +200,7 @@ mod tests {
         let dest_dir = temp_dir.path().join("out");
 
         {
-            let file = fs::File::create(&archive_path)?;
+            let file = File::create(&archive_path)?;
             let mut zip = zip::ZipWriter::new(file);
             let options = FileOptions::<()>::default();
 
