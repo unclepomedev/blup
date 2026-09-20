@@ -5,7 +5,7 @@ use futures_util::stream::{self, StreamExt};
 use reqwest::Client;
 
 /// Release directories older than this are ignored (legacy naming, no modern platform builds).
-const MIN_ARCHIVE_SERIES: &str = "2.80";
+const MIN_ARCHIVE_SERIES: &str = "2.93";
 
 /// Number of directory index pages fetched in parallel.
 const FETCH_CONCURRENCY: usize = 8;
@@ -106,8 +106,7 @@ mod tests {
 
     const ROOT_INDEX: &str = r#"
         <a href="../">../</a>
-        <a href="Blender2.79/">Blender2.79/</a>
-        <a href="Blender2.80/">Blender2.80/</a>
+        <a href="Blender2.93/">Blender2.93/</a>
         <a href="Blender5.2/">Blender5.2/</a>
         <a href="Blender5.10/">Blender5.10/</a>
         <a href="Blender2.28a/">Blender2.28a/</a>
@@ -135,7 +134,7 @@ mod tests {
     fn test_parse_release_series() {
         let series = parse_release_series(ROOT_INDEX);
 
-        assert_eq!(series, vec!["5.10", "5.2", "2.80"]);
+        assert_eq!(series, vec!["5.10", "5.2", "2.93"]);
     }
 
     #[test]
