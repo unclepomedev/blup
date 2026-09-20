@@ -154,23 +154,51 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
     let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
     let platform = os::detect_platform()?;
 
-    let builds = daily::fetch_daily_list(&client).await?;
-    let sections = daily::categorize_builds(builds, &platform);
+    let sections = fetch_daily_sections(&client, &platform, all).await?;
 
-    print_daily_section(sections.daily, installed_versions);
+    if let Some(sections) = &sections {
+        print_daily_section(&sections.daily, installed_versions);
+    }
 
     // `--all` already contains every stable release, so the digest section is redundant.
     if all {
         print_all_releases(&client, &platform, installed_versions).await?;
-        println!(); // Footer margin
-        return Ok(());
+    } else if let Some(sections) = &sections {
+        print_stable_section(&sections.stable, installed_versions);
     }
 
+    println!(); // Footer margin
+    Ok(())
+}
+
+/// Fetches and categorizes daily builds.
+///
+/// With `--all` a failing daily request must not hide the archive listing,
+/// so the error is reported as a warning and `None` is returned instead.
+async fn fetch_daily_sections(
+    client: &Client,
+    platform: &os::Platform,
+    all: bool,
+) -> Result<Option<daily::RemoteSection>> {
+    match daily::fetch_daily_list(client).await {
+        Ok(builds) => Ok(Some(daily::categorize_builds(builds, platform))),
+        Err(err) if all => {
+            println!(
+                "\n{}",
+                style(format!("Failed to fetch daily builds: {}", err)).yellow()
+            );
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn print_stable_section(stable: &[daily::DailyBuild], installed_versions: &HashSet<String>) {
     println!("\n{}", style("Stable Releases (Active Support):").bold());
-    if sections.stable.is_empty() {
+    if stable.is_empty() {
         println!("  (None found)");
     }
-    for build in sections.stable {
+    for build in stable {
         let is_lts = daily::is_lts(&build.version);
         print_remote_entry(
             &build.version,
@@ -180,12 +208,9 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
             is_lts,
         );
     }
-
-    println!(); // Footer margin
-    Ok(())
 }
 
-fn print_daily_section(daily_builds: Vec<daily::DailyBuild>, installed_versions: &HashSet<String>) {
+fn print_daily_section(daily_builds: &[daily::DailyBuild], installed_versions: &HashSet<String>) {
     println!("\n{}", style("Daily Builds (builder.blender.org):").bold());
     if daily_builds.is_empty() {
         println!("  (None found for this platform)");
