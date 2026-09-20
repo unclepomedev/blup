@@ -152,9 +152,16 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
     println!("{}", style("Fetching remote versions...").dim());
 
     let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
-    let builds = daily::fetch_daily_list(&client).await?;
     let platform = os::detect_platform()?;
 
+    // `--all` already contains every release, so the digest sections are redundant.
+    if all {
+        print_all_releases(&client, &platform, installed_versions).await?;
+        println!(); // Footer margin
+        return Ok(());
+    }
+
+    let builds = daily::fetch_daily_list(&client).await?;
     let sections = daily::categorize_builds(builds, &platform);
 
     println!("\n{}", style("Daily Builds (builder.blender.org):").bold());
@@ -198,10 +205,6 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
             "",
             is_lts,
         );
-    }
-
-    if all {
-        print_all_releases(&client, &platform, installed_versions).await?;
     }
 
     println!(); // Footer margin
