@@ -57,11 +57,12 @@ blup run -- file.blend --background  # Run with arguments
 
 ```shell
 blup list --remote               # List available versions (Active Stable & Daily)
-blup install 4.2 --daily         # Install latest 4.2 experimental
+blup list --remote --all         # List every version from the official archive
+blup install 5.2 --daily         # Install latest 5.2 experimental
 blup install daily --daily       # Install latest main branch
 ```
 
-**Note**: The remote list reflects the active build pipeline. Intermediate stable versions (e.g., `4.5.5`) disappear from the list once superseded, but can still be installed directly: `blup install 4.5.5`.
+**Note**: The remote list reflects the active build pipeline. Intermediate stable versions (e.g., `5.1.1`) disappear from the list once superseded, but can still be installed directly: `blup install 5.1.1`.
 
 ### Version Control
 

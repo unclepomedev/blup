@@ -1,5 +1,5 @@
 use crate::core::config::{LinkedEntry, Settings};
-use crate::core::{config, daily, os};
+use crate::core::{archive, config, daily, os, version};
 use anyhow::Result;
 use console::style;
 use reqwest::Client;
@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::time::Duration;
 
-pub async fn run(remote: bool) -> Result<()> {
+pub async fn run(remote: bool, all: bool) -> Result<()> {
     let installed_versions = get_installed_versions()?;
 
     if !remote {
@@ -15,7 +15,7 @@ pub async fn run(remote: bool) -> Result<()> {
         return Ok(());
     }
 
-    list_remote_builds(&installed_versions).await?;
+    list_remote_builds(&installed_versions, all).await?;
     Ok(())
 }
 
@@ -148,20 +148,74 @@ fn print_single_link_entry(name: &str, entry: &LinkedEntry, is_default: bool, is
     );
 }
 
-async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> {
+async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> Result<()> {
     println!("{}", style("Fetching remote versions...").dim());
 
     let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
-    let builds = daily::fetch_daily_list(&client).await?;
     let platform = os::detect_platform()?;
 
-    let sections = daily::categorize_builds(builds, &platform);
+    let sections = fetch_daily_sections(&client, &platform, all).await?;
 
+    if let Some(sections) = &sections {
+        print_daily_section(&sections.daily, installed_versions);
+    }
+
+    // `--all` already contains every stable release, so the digest section is redundant.
+    if all {
+        print_all_releases(&client, &platform, installed_versions).await?;
+    } else if let Some(sections) = &sections {
+        print_stable_section(&sections.stable, installed_versions);
+    }
+
+    println!(); // Footer margin
+    Ok(())
+}
+
+/// Fetches and categorizes daily builds.
+///
+/// With `--all` a failing daily request must not hide the archive listing,
+/// so the error is reported as a warning and `None` is returned instead.
+async fn fetch_daily_sections(
+    client: &Client,
+    platform: &os::Platform,
+    all: bool,
+) -> Result<Option<daily::RemoteSection>> {
+    match daily::fetch_daily_list(client).await {
+        Ok(builds) => Ok(Some(daily::categorize_builds(builds, platform))),
+        Err(err) if all => {
+            println!(
+                "\n{}",
+                style(format!("Failed to fetch daily builds: {}", err)).yellow()
+            );
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn print_stable_section(stable: &[daily::DailyBuild], installed_versions: &HashSet<String>) {
+    println!("\n{}", style("Stable Releases (Active Support):").bold());
+    if stable.is_empty() {
+        println!("  (None found)");
+    }
+    for build in stable {
+        let is_lts = daily::is_lts(&build.version);
+        print_remote_entry(
+            &build.version,
+            &build.version,
+            installed_versions,
+            "",
+            is_lts,
+        );
+    }
+}
+
+fn print_daily_section(daily_builds: &[daily::DailyBuild], installed_versions: &HashSet<String>) {
     println!("\n{}", style("Daily Builds (builder.blender.org):").bold());
-    if sections.daily.is_empty() {
+    if daily_builds.is_empty() {
         println!("  (None found for this platform)");
     }
-    for build in sections.daily {
+    for build in daily_builds {
         let full_name = format!("{}-{}-{}", build.version, build.risk_id, build.hash);
         let note = match build.risk_id.as_str() {
             "alpha" => "Alpha",
@@ -184,23 +238,35 @@ async fn list_remote_builds(installed_versions: &HashSet<String>) -> Result<()> 
             is_lts,
         );
     }
+}
 
-    println!("\n{}", style("Stable Releases (Active Support):").bold());
-    if sections.stable.is_empty() {
-        println!("  (None found)");
+async fn print_all_releases(
+    client: &Client,
+    platform: &os::Platform,
+    installed_versions: &HashSet<String>,
+) -> Result<()> {
+    let listing = archive::fetch_all_versions(client, version::OFFICIAL_URL, platform).await?;
+
+    println!("\n{}", style("All Releases (download.blender.org):").bold());
+    if listing.versions.is_empty() {
+        println!("  (None found for this platform)");
     }
-    for build in sections.stable {
-        let is_lts = daily::is_lts(&build.version);
-        print_remote_entry(
-            &build.version,
-            &build.version,
-            installed_versions,
-            "",
-            is_lts,
+    for v in &listing.versions {
+        let is_lts = daily::is_lts(v);
+        print_remote_entry(v, v, installed_versions, "", is_lts);
+    }
+
+    for skipped in &listing.skipped {
+        println!(
+            "{}",
+            style(format!(
+                "  (Skipped Blender{}: {})",
+                skipped.series, skipped.error
+            ))
+            .yellow()
         );
     }
 
-    println!(); // Footer margin
     Ok(())
 }
 
