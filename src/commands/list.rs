@@ -245,15 +245,26 @@ async fn print_all_releases(
     platform: &os::Platform,
     installed_versions: &HashSet<String>,
 ) -> Result<()> {
-    let versions = archive::fetch_all_versions(client, version::OFFICIAL_URL, platform).await?;
+    let listing = archive::fetch_all_versions(client, version::OFFICIAL_URL, platform).await?;
 
     println!("\n{}", style("All Releases (download.blender.org):").bold());
-    if versions.is_empty() {
+    if listing.versions.is_empty() {
         println!("  (None found for this platform)");
     }
-    for v in &versions {
+    for v in &listing.versions {
         let is_lts = daily::is_lts(v);
         print_remote_entry(v, v, installed_versions, "", is_lts);
+    }
+
+    for skipped in &listing.skipped {
+        println!(
+            "{}",
+            style(format!(
+                "  (Skipped Blender{}: {})",
+                skipped.series, skipped.error
+            ))
+            .yellow()
+        );
     }
 
     Ok(())

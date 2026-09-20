@@ -70,34 +70,57 @@ async fn fetch_text(client: &Client, url: &str) -> Result<String> {
     Ok(body)
 }
 
+/// A release series that could not be fetched, along with the reason.
+#[derive(Debug, Clone)]
+pub struct SkippedSeries {
+    pub series: String,
+    pub error: String,
+}
+
+/// Result of an archive listing: successfully collected versions plus skipped series.
+#[derive(Debug, Default, Clone)]
+pub struct ArchiveListing {
+    pub versions: Vec<String>,
+    pub skipped: Vec<SkippedSeries>,
+}
+
 /// Fetches every official release available for the given platform from the download archive.
-/// Returns versions sorted from newest to oldest.
+///
+/// A single unreachable series does not fail the whole listing: successful pages are
+/// aggregated and the failed series are reported through [`ArchiveListing::skipped`].
 pub async fn fetch_all_versions(
     client: &Client,
     base: &str,
     platform: &Platform,
-) -> Result<Vec<String>> {
+) -> Result<ArchiveListing> {
     let base_url = base.trim_end_matches('/');
     let index = fetch_text(client, &format!("{}/", base_url)).await?;
     let series = parse_release_series(&index);
 
     let pages = stream::iter(series.into_iter().map(|name| {
         let url = format!("{}/Blender{}/", base_url, name);
-        async move { fetch_text(client, &url).await }
+        async move { (name, fetch_text(client, &url).await) }
     }))
     .buffer_unordered(FETCH_CONCURRENCY)
     .collect::<Vec<_>>()
     .await;
 
     let mut versions = Vec::new();
-    // A single unreachable series must not break the whole listing.
-    for html in pages.into_iter().flatten() {
-        versions.extend(parse_series_versions(&html, platform));
+    let mut skipped = Vec::new();
+    for (name, page) in pages {
+        match page {
+            Ok(html) => versions.extend(parse_series_versions(&html, platform)),
+            Err(err) => skipped.push(SkippedSeries {
+                series: name,
+                error: format!("{:#}", err),
+            }),
+        }
     }
 
     versions.sort_by(|a, b| human_sort_version(b, a));
     versions.dedup();
-    Ok(versions)
+    skipped.sort_by(|a, b| human_sort_version(&b.series, &a.series));
+    Ok(ArchiveListing { versions, skipped })
 }
 
 #[cfg(test)]
