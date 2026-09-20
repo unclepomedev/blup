@@ -154,21 +154,43 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
     let client = Client::builder().timeout(Duration::from_secs(15)).build()?;
     let platform = os::detect_platform()?;
 
-    // `--all` already contains every release, so the digest sections are redundant.
+    let builds = daily::fetch_daily_list(&client).await?;
+    let sections = daily::categorize_builds(builds, &platform);
+
+    print_daily_section(sections.daily, installed_versions);
+
+    // `--all` already contains every stable release, so the digest section is redundant.
     if all {
         print_all_releases(&client, &platform, installed_versions).await?;
         println!(); // Footer margin
         return Ok(());
     }
 
-    let builds = daily::fetch_daily_list(&client).await?;
-    let sections = daily::categorize_builds(builds, &platform);
+    println!("\n{}", style("Stable Releases (Active Support):").bold());
+    if sections.stable.is_empty() {
+        println!("  (None found)");
+    }
+    for build in sections.stable {
+        let is_lts = daily::is_lts(&build.version);
+        print_remote_entry(
+            &build.version,
+            &build.version,
+            installed_versions,
+            "",
+            is_lts,
+        );
+    }
 
+    println!(); // Footer margin
+    Ok(())
+}
+
+fn print_daily_section(daily_builds: Vec<daily::DailyBuild>, installed_versions: &HashSet<String>) {
     println!("\n{}", style("Daily Builds (builder.blender.org):").bold());
-    if sections.daily.is_empty() {
+    if daily_builds.is_empty() {
         println!("  (None found for this platform)");
     }
-    for build in sections.daily {
+    for build in daily_builds {
         let full_name = format!("{}-{}-{}", build.version, build.risk_id, build.hash);
         let note = match build.risk_id.as_str() {
             "alpha" => "Alpha",
@@ -191,24 +213,6 @@ async fn list_remote_builds(installed_versions: &HashSet<String>, all: bool) -> 
             is_lts,
         );
     }
-
-    println!("\n{}", style("Stable Releases (Active Support):").bold());
-    if sections.stable.is_empty() {
-        println!("  (None found)");
-    }
-    for build in sections.stable {
-        let is_lts = daily::is_lts(&build.version);
-        print_remote_entry(
-            &build.version,
-            &build.version,
-            installed_versions,
-            "",
-            is_lts,
-        );
-    }
-
-    println!(); // Footer margin
-    Ok(())
 }
 
 async fn print_all_releases(
