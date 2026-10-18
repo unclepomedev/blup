@@ -1,7 +1,9 @@
 use anyhow::{Context, Result, bail};
-use std::fs::{self, File};
-use std::io::copy;
-use std::path::{Component, Path, PathBuf};
+use std::{
+    fs::{self, File},
+    io::copy,
+    path::{Component, Path, PathBuf},
+};
 
 /// Extracts the specified archive to the destination directory.
 /// Supports .zip, .tar.xz, and .dmg (macOS only) formats.
@@ -60,7 +62,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let raw_path = match file.enclosed_name() {
             Some(p) => p.to_owned(),
-            None => file.mangled_name(),
+            None => file.mangled_name()?,
         };
 
         let stripped_path = match sanitize_and_strip_path(&raw_path)? {
@@ -70,7 +72,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let outpath = dest_dir.join(stripped_path);
 
-        if file.name().ends_with('/') {
+        if file.name()?.ends_with('/') {
             fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent()
