@@ -61,8 +61,8 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         let mut file = archive.by_index(i)?;
 
         let raw_path = match file.enclosed_name() {
-            Some(p) => p.to_owned(),
-            None => file.mangled_name()?,
+            Some(p) => p,
+            None => bail!("Unsafe path in zip entry at index {}", i),
         };
 
         let stripped_path = match sanitize_and_strip_path(&raw_path)? {
@@ -72,7 +72,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let outpath = dest_dir.join(stripped_path);
 
-        if file.name()?.ends_with('/') {
+        if file.is_dir() {
             fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent()
