@@ -1,7 +1,9 @@
 use anyhow::{Context, Result, bail};
-use std::fs::{self, File};
-use std::io::copy;
-use std::path::{Component, Path, PathBuf};
+use std::{
+    fs::{self, File},
+    io::copy,
+    path::{Component, Path, PathBuf},
+};
 
 /// Extracts the specified archive to the destination directory.
 /// Supports .zip, .tar.xz, and .dmg (macOS only) formats.
@@ -59,8 +61,8 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         let mut file = archive.by_index(i)?;
 
         let raw_path = match file.enclosed_name() {
-            Some(p) => p.to_owned(),
-            None => file.mangled_name(),
+            Some(p) => p,
+            None => bail!("Unsafe path in zip entry at index {}", i),
         };
 
         let stripped_path = match sanitize_and_strip_path(&raw_path)? {
@@ -70,7 +72,7 @@ fn extract_zip(archive_path: &Path, dest_dir: &Path) -> Result<()> {
 
         let outpath = dest_dir.join(stripped_path);
 
-        if file.name().ends_with('/') {
+        if file.is_dir() {
             fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent()
@@ -221,6 +223,36 @@ mod tests {
 
         let nested_file = dest_dir.join("subdir/nested.txt");
         assert!(nested_file.exists());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_zip_rejects_unsafe_path() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let archive_path = temp_dir.path().join("evil.zip");
+        let dest_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&dest_dir)?;
+
+        {
+            let file = File::create(&archive_path)?;
+            let mut zip = zip::ZipWriter::new(file);
+            let options = FileOptions::<()>::default();
+
+            zip.start_file("../outside.txt", options)?;
+            zip.write_all(b"pwned")?;
+
+            zip.finish()?;
+        }
+
+        let err = extract(&archive_path, &dest_dir).expect_err("unsafe path must be rejected");
+        assert!(
+            err.to_string().contains("Unsafe path in zip entry"),
+            "unexpected error: {err:#}"
+        );
+
+        assert!(!temp_dir.path().join("outside.txt").exists());
+        assert!(!dest_dir.join("outside.txt").exists());
 
         Ok(())
     }
