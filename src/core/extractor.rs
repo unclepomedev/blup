@@ -226,4 +226,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_extract_zip_rejects_unsafe_path() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let archive_path = temp_dir.path().join("evil.zip");
+        let dest_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&dest_dir)?;
+
+        {
+            let file = File::create(&archive_path)?;
+            let mut zip = zip::ZipWriter::new(file);
+            let options = FileOptions::<()>::default();
+
+            zip.start_file("../outside.txt", options)?;
+            zip.write_all(b"pwned")?;
+
+            zip.finish()?;
+        }
+
+        let err = extract(&archive_path, &dest_dir).expect_err("unsafe path must be rejected");
+        assert!(
+            err.to_string().contains("Unsafe path in zip entry"),
+            "unexpected error: {err:#}"
+        );
+
+        assert!(!temp_dir.path().join("outside.txt").exists());
+        assert!(!dest_dir.join("outside.txt").exists());
+
+        Ok(())
+    }
 }
