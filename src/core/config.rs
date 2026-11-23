@@ -24,11 +24,7 @@ pub fn is_version_or_link_installed(v: &str) -> Result<bool> {
     }
 
     let settings = load().unwrap_or_default();
-    if settings.links.contains_key(v) {
-        return Ok(true);
-    }
-
-    Ok(false)
+    Ok(settings.links.contains_key(v))
 }
 
 /// Resolves the executable path for a given version or link name.
