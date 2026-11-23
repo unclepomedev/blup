@@ -6,11 +6,10 @@ description = "The Blender Version Manager"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/unclepomedev/blup"
-homepage = "https://github.com/unclepomedev/blup"
 
 [dependencies]
-anyhow = "1.0.104"
-clap = { version = "4.6.7", features = ["derive"] }
+anyhow = "1.0.105"
+clap = { version = "4.6.9", features = ["derive"] }
 console = "0.16.6"
 directories = "6.0.0"
 futures-util = "0.3.34"
@@ -21,8 +20,8 @@ tar = "0.4.46"
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["full"] }
 xz2 = "0.1.7"
-zip = "9.1.0"
-toml = "1.1.8"
+zip = "9.8.2"
+toml = "1.2.2"
 chrono = "0.4.45"
 sha2 = "0.11.1"
 hex = "0.4.3"
